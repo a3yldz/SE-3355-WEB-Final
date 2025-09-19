@@ -9,7 +9,24 @@ import MapScreen from "./screens/MapScreen";
 import FireDeptScreen from "./screens/FireDeptScreen";
 import { colors } from "./theme";
 
-const qc = new QueryClient();
+function getQueryClient() {
+  const g = globalThis as any;
+  if (!g.__WILDFIRE_QC__) {
+    g.__WILDFIRE_QC__ = new QueryClient({
+      defaultOptions: {
+        queries: {
+          staleTime: 60_000,           // useRiskNowcast ile uyumlu
+          retry: 1,                    // agresif değil
+          refetchOnWindowFocus: false, // RN'de gerek yok
+          refetchOnReconnect: true,
+        },
+      },
+    });
+  }
+  return g.__WILDFIRE_QC__ as QueryClient;
+}
+
+const qc = getQueryClient();
 
 export default function App() {
   const route = useNavStore((s) => s.route);
