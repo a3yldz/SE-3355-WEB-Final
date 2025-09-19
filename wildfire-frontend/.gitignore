@@ -39,3 +39,23 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual env
+.venv/
+venv/
+wildfire-backend/venv/
+
+# Secrets
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/

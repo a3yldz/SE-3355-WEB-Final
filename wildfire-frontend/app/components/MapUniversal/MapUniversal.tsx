@@ -7,10 +7,9 @@ type BBox = { minLon: number; minLat: number; maxLon: number; maxLat: number };
 export type MapUniversalProps = {
   initialCenter: [number, number];
   initialZoom?: number;
-  riskGeoJSON?: any;      // GeoJSON FC<Point,...>
+  riskGeoJSON?: any;
   riskOpacity?: number;
-
-  // ✅ yeni propslar
+  hotThreshold?: number;          
   onRiskCellPress?: (p: any) => void;
   onViewportChange?: (bbox: BBox) => void;
 };
@@ -23,8 +22,9 @@ export default function MapUniversal(props: MapUniversalProps) {
         initialZoom={props.initialZoom}
         riskGeoJSON={props.riskGeoJSON}
         riskOpacity={props.riskOpacity}
-        onRiskCellPress={props.onRiskCellPress}     // ✅ forward
-        onViewportChange={props.onViewportChange}   // ✅ forward (opsiyonel)
+        hotThreshold={props.hotThreshold}
+        onRiskCellPress={props.onRiskCellPress}
+        onViewportChange={props.onViewportChange}
       />
     );
   }

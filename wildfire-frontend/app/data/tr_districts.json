@@ -1,0 +1,10 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "city": "Istanbul", "district": "Kadıköy", "region": "Güney" },
+      "geometry": { "type": "Polygon", "coordinates": [  ] }
+    }
+  ]
+}
