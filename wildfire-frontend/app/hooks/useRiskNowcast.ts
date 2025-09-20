@@ -30,7 +30,8 @@ export function useRiskNowcasts(
   areas: Area[],
   hourOffset = 3,
   nx = 36,
-  ny = 36
+  ny = 36,
+  provider = "heuristic"
 ) {
   return useQueries({
     queries: areas.map((a) => {
@@ -42,6 +43,7 @@ export function useRiskNowcasts(
         nx: String(nx),
         ny: String(ny),
         hourOffset: String(hourOffset),
+        provider: provider,
       }).toString();
 
       return {

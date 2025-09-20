@@ -36,55 +36,145 @@ app.add_middleware(
 async def health():
     return {"ok": True, "ts": time.time()}
 
-# ----------------- Meteo fetch -----------------
+# ----------------- OpenWeather API Integration -----------------
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "e7e87950d4cbef19404e95fbad64d7d3")
+
 async def fetch_meteo(lat_b: float, lon_b: float, hour_offset: int):
+    """OpenWeather API ile gelişmiş hava durumu verisi çek"""
     key = (lat_b, lon_b, hour_offset)
     now = time.time()
 
     hit = _CACHE.get(key)
     if hit and now - hit[4] < TTL_SEC:
-        return hit[0], hit[1], hit[2], hit[3]
+        if len(hit) > 5:  # Yeni format (ek bilgilerle)
+            return hit[0], hit[1], hit[2], hit[3], hit[5], hit[6], hit[7], hit[8], hit[9], hit[10], hit[11], hit[12], hit[13]
+        else:  # Eski format
+            return hit[0], hit[1], hit[2], hit[3], 1013.25, 10.0, 0, 0, 0, 0, hit[0], hit[0]-5, "Bilinmeyen"
 
-    url = (
-        "https://api.open-meteo.com/v1/forecast"
-        f"?latitude={lat_b}&longitude={lon_b}"
-        "&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m"
-        "&wind_speed_unit=ms"
-        "&forecast_days=2&timezone=auto"
-    )
+    # OpenWeather API kullan
+    url = "https://api.openweathermap.org/data/2.5/weather"
+    params = {
+        "lat": lat_b,
+        "lon": lon_b,
+        "appid": OPENWEATHER_API_KEY,
+        "units": "metric",
+        "lang": "tr"
+    }
+    
     last_err: Optional[Exception] = None
     for i in range(MAX_RETRIES):
         try:
-            r = await app.state.http.get(url)
+            r = await app.state.http.get(url, params=params)
             r.raise_for_status()
             js = r.json()
-            tarr = js["hourly"]["temperature_2m"]
-            harr = js["hourly"]["relative_humidity_2m"]
-            warr = js["hourly"]["wind_speed_10m"]
-            darr = js["hourly"]["wind_direction_10m"]
-            idx = max(0, min(hour_offset, len(tarr) - 1))
-            temp = float(tarr[idx]); rh = float(harr[idx]); wind = float(warr[idx]); wdir = float(darr[idx])
-            _CACHE[key] = (temp, rh, wind, wdir, now)
-            return temp, rh, wind, wdir
+            
+            # OpenWeather API'den veri çıkar
+            temp = float(js["main"]["temp"])
+            rh = float(js["main"]["humidity"])
+            wind = float(js["wind"]["speed"])
+            wdir = float(js["wind"].get("deg", 0))
+            
+            # Ek hava durumu bilgileri
+            pressure = float(js["main"].get("pressure", 1013.25))
+            visibility = float(js.get("visibility", 10000)) / 1000  # km cinsinden
+            cloud_cover = float(js["clouds"].get("all", 0))
+            rain_1h = float(js.get("rain", {}).get("1h", 0))
+            snow_1h = float(js.get("snow", {}).get("1h", 0))
+            uv_index = float(js.get("uvi", 0))
+            feels_like = float(js["main"].get("feels_like", temp))
+            dew_point = float(js["main"].get("dew_point", temp - 5))
+            
+            # Hava durumu açıklaması
+            weather_desc = js["weather"][0]["description"] if js.get("weather") else "Bilinmeyen"
+            
+            # Saat kaydırma için basit tahmin (gerçek uygulamada forecast API kullanılabilir)
+            if hour_offset > 0:
+                temp += hour_offset * 0.5  # Saat başına 0.5°C artış
+                rh -= hour_offset * 2      # Saat başına %2 nem azalış
+                wind += hour_offset * 0.1  # Saat başına 0.1 m/s rüzgar artışı
+            
+            # Cache'e ek bilgileri de ekle
+            _CACHE[key] = (temp, rh, wind, wdir, now, pressure, visibility, cloud_cover, rain_1h, snow_1h, uv_index, feels_like, dew_point, weather_desc)
+            return temp, rh, wind, wdir, pressure, visibility, cloud_cover, rain_1h, snow_1h, uv_index, feels_like, dew_point, weather_desc
+            
         except Exception as e:
             last_err = e
             await asyncio.sleep((RETRY_BASE_MS * (2 ** i)) / 1000)
 
     if hit:  # stale fallback
-        return hit[0], hit[1], hit[2], hit[3]
-    raise HTTPException(status_code=502, detail=f"upstream fetch failed: {type(last_err).__name__}")
+        if len(hit) > 5:  # Yeni format
+            return hit[0], hit[1], hit[2], hit[3], hit[5], hit[6], hit[7], hit[8], hit[9], hit[10], hit[11], hit[12], hit[13]
+        else:  # Eski format
+            return hit[0], hit[1], hit[2], hit[3], 1013.25, 10.0, 0, 0, 0, 0, hit[0], hit[0]-5, "Bilinmeyen"
+    raise HTTPException(status_code=502, detail=f"OpenWeather API failed: {type(last_err).__name__}")
 
 # ----------------- Risk providers -----------------
 def heuristic_risk(temp: float, rh: float, wind: float) -> float:
+    """Basit heuristik risk hesaplama"""
     t = max(0.0, min(1.0, (temp - 10.0) / 25.0))   # 10–35°C
     h = max(0.0, min(1.0, 1.0 - rh / 100.0))       # düşük nem ↑ risk
     w = max(0.0, min(1.0, wind / 12.0))            # 0–12 m/s
     return max(0.0, min(1.0, 0.5*t + 0.3*h + 0.2*w))
 
+def advanced_risk(temp: float, rh: float, wind: float, wind_dir: float, lat: float, lon: float) -> float:
+    """Gelişmiş risk hesaplama - OpenWeather verileri ile"""
+    
+    # 1. Sıcaklık faktörü (30°C üzeri kritik)
+    temp_risk = max(0, (temp - 20) / 20)  # 20-40°C arası
+    
+    # 2. Nem faktörü (düşük nem = yüksek risk)
+    humidity_risk = max(0, (100 - rh) / 100)
+    
+    # 3. Rüzgar faktörü (güçlü rüzgar = yüksek risk)
+    wind_risk = min(1, wind / 15)  # 15 m/s üzeri kritik
+    
+    # 4. Rüzgar yönü faktörü (güney rüzgarı riskli)
+    wind_dir_risk = 1.0
+    if 150 <= wind_dir <= 210:  # Güney
+        wind_dir_risk = 1.3
+    elif 60 <= wind_dir <= 120:  # Doğu
+        wind_dir_risk = 1.1
+    
+    # 5. Coğrafi faktör (Türkiye bölgeleri)
+    geo_risk = 1.0
+    if 40.0 <= lat <= 42.0 and 27.0 <= lon <= 30.0:  # Marmara
+        geo_risk = 1.1
+    elif 38.0 <= lat <= 40.0 and 26.0 <= lon <= 30.0:  # Ege
+        geo_risk = 1.2  # Akdeniz iklimi - yüksek risk
+    elif 36.0 <= lat <= 38.0 and 26.0 <= lon <= 30.0:  # Akdeniz
+        geo_risk = 1.3  # En yüksek risk
+    elif 39.0 <= lat <= 42.0 and 30.0 <= lon <= 35.0:  # İç Anadolu
+        geo_risk = 0.9  # Daha düşük risk
+    
+    # 6. Saat faktörü (öğleden sonra riskli)
+    current_hour = time.localtime().tm_hour
+    time_risk = 1.0
+    if 12 <= current_hour <= 18:  # Öğleden sonra
+        time_risk = 1.2
+    elif 6 <= current_hour <= 12:  # Sabah
+        time_risk = 0.8
+    
+    # Toplam risk hesaplama
+    base_risk = (
+        temp_risk * 0.3 +
+        humidity_risk * 0.25 +
+        wind_risk * 0.2 +
+        wind_dir_risk * 0.15 +
+        geo_risk * 0.1
+    )
+    
+    total_risk = base_risk * time_risk
+    
+    return min(1.0, max(0.0, total_risk))
+
 class HeuristicProvider:
     name = "heuristic"
-    async def score(self, *, temp: float, rh: float, wind: float, **_):
-        return heuristic_risk(temp, rh, wind)
+    async def score(self, *, temp: float, rh: float, wind: float, wind_dir: float = 0, lat: float = 0, lon: float = 0, **_):
+        # OpenWeather verileri varsa gelişmiş hesaplama kullan
+        if lat != 0 and lon != 0:
+            return advanced_risk(temp, rh, wind, wind_dir, lat, lon)
+        else:
+            return heuristic_risk(temp, rh, wind)
 
 class AIRemoteProvider:
     """Dış bir AI servisine POST eder. Ortam değişkenleri:
@@ -179,7 +269,7 @@ async def risk_nowcast(
     buckets = set((bucketize(lat, BUCKET), bucketize(lon, BUCKET)) for lon in lons for lat in lats)
 
     # her bucket için meteo
-    meteo: Dict[Tuple[float, float], Tuple[float, float, float, float]] = {}
+    meteo: Dict[Tuple[float, float], Tuple] = {}
     for (lat_b, lon_b) in buckets:
         try:
             meteo[(lat_b, lon_b)] = await fetch_meteo(lat_b, lon_b, hourOffset)
@@ -193,7 +283,24 @@ async def risk_nowcast(
             key2 = (bucketize(lat, BUCKET), bucketize(lon, BUCKET))
             m = meteo.get(key2)
             if not m: continue
-            temp, rh, wind, wdir = m
+            
+            # Temel veriler
+            temp, rh, wind, wdir = m[0], m[1], m[2], m[3]
+            
+            # Ek hava durumu bilgileri (varsa)
+            pressure = m[4] if len(m) > 4 else 1013.25
+            visibility = m[5] if len(m) > 5 else 10.0
+            cloud_cover = m[6] if len(m) > 6 else 0
+            rain_1h = m[7] if len(m) > 7 else 0
+            snow_1h = m[8] if len(m) > 8 else 0
+            uv_index = m[9] if len(m) > 9 else 0
+            feels_like = m[10] if len(m) > 10 else temp
+            dew_point = m[11] if len(m) > 11 else temp - 5
+            weather_desc = m[12] if len(m) > 12 else "Bilinmeyen"
+            
+            # Debug: Ek bilgileri kontrol et
+            print(f"Debug - lat:{lat}, lon:{lon}, pressure:{pressure}, visibility:{visibility}, cloud_cover:{cloud_cover}")
+            
             risk = await prov.score(
                 lat=lat, lon=lon, hour_offset=hourOffset,
                 temp=temp, rh=rh, wind=wind, wind_dir=wdir
@@ -204,6 +311,9 @@ async def risk_nowcast(
                 "properties": {
                     "risk": float(max(0.0, min(1.0, risk))),
                     "temp": temp, "rh": rh, "wind": wind, "wind_dir": wdir,
+                    "pressure": pressure, "visibility": visibility, "cloud_cover": cloud_cover,
+                    "rain_1h": rain_1h, "snow_1h": snow_1h, "uv_index": uv_index,
+                    "feels_like": feels_like, "dew_point": dew_point, "weather_desc": weather_desc,
                     "risk_source": getattr(prov, "name", "custom"),
                 }
             })

@@ -37,10 +37,25 @@ const degToCompass = (deg?: number) => {
 export default function MapScreen() {
   const { layerRiskVisible, riskOpacity, hourOffset, setHourOffset, toggleRisk } = useUIStore();
 
-  // --- Çoklu AOI fetch (paralel)
-  const results = useRiskNowcasts(AREAS, hourOffset, 28, 28); // performans için 28x28
+  // --- Çoklu AOI fetch (paralel) - Backend'den gerçek veri (OpenWeather entegrasyonu)
+  const results = useRiskNowcasts(AREAS, hourOffset, 28, 28, "heuristic"); // OpenWeather ile gelişmiş heuristik
   const anyLoading = results.some((q) => q.isLoading);
   const anyError   = results.some((q) => q.isError);
+  
+  // Debug: Backend response kontrolü
+  console.log("🔍 Backend Response Debug:", {
+    resultsCount: results.length,
+    anyLoading,
+    anyError,
+    results: results.map((r, i) => ({
+      index: i,
+      isLoading: r.isLoading,
+      isError: r.isError,
+      error: r.error,
+      dataLength: r.data?.features?.length || 0,
+      hasData: !!r.data
+    }))
+  });
 
   // --- Tüm AOI'leri tek FeatureCollection'da birleştir
   const merged = useMemo(() => {
@@ -106,16 +121,36 @@ export default function MapScreen() {
         initialZoom={6.2} // 3 şehri birden görmek için biraz uzaklaş
         riskGeoJSON={paintedRisk}
         riskOpacity={riskOpacity}
-        onRiskCellPress={(p: any) => setCell(p)}
+        onRiskCellPress={(p: any) => {
+          // Koordinatları doğru şekilde geç
+          const cellData = {
+            ...p,
+            lon: p.coord?.[0] || p.coordinates?.[0] || p.lon || 0,
+            lat: p.coord?.[1] || p.coordinates?.[1] || p.lat || 0,
+            coordinates: p.coord || p.coordinates || [p.lon || 0, p.lat || 0]
+          };
+          console.log("🔍 Hücre Tıklandı:", {
+            original: p,
+            processed: cellData,
+            coord: p.coord,
+            coordinates: p.coordinates,
+            lon: cellData.lon,
+            lat: cellData.lat
+          });
+          setCell(cellData);
+        }}
       />
 
       {/* Top Bar */}
       <View style={{ position: "absolute", top: 12, left: 12, right: 12, gap: 8 }}>
         <View style={{ backgroundColor: "rgba(0,0,0,0.6)", borderRadius: 12, padding: 10 }}>
           <Text style={{ color: "#fff", fontWeight: "700" }}>
-            AOI’ler: {AREAS.map(a => a.name).join(" • ")}
+            AOI'ler: {AREAS.map(a => a.name).join(" • ")}
           </Text>
           <Text style={{ color: "#ddd", marginTop: 2 }}>Saat kaydır: şu an + {hourOffset}h</Text>
+          <Text style={{ color: "#9ae6b4", fontSize: 10, marginTop: 2 }}>
+            💡 Saat barı ile gelecekteki yangın riskini tahmin edin
+          </Text>
 
           <View style={{ flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
             {[0, 1, 3, 6, 12, 24].map((h) => (
@@ -165,32 +200,121 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* Hücre + birleşik ortalama kartı */}
+      {/* Detaylı Hücre Bilgi Kartı */}
       {(cell || stats) && (
-        <View style={{ position: "absolute", bottom: 16, right: 12, backgroundColor: "rgba(0,0,0,0.8)", padding: 12, borderRadius: 10, width: 300 }}>
+        <View style={{ position: "absolute", bottom: 16, right: 12, backgroundColor: "rgba(0,0,0,0.9)", padding: 16, borderRadius: 12, width: 350, maxHeight: 400 }}>
           {cell && (
             <>
-              <Text style={{ color: "#fff", fontWeight: "700" }}>
-                Hücre — {cell.aoiName ?? cell.aoiId ?? ""}
-              </Text>
-              <Text style={{ color: "#fff" }}>Risk: {(Number(cell.risk) * 100).toFixed(0)}%</Text>
-              <Text style={{ color: "#fff" }}>Sıcaklık: {Number(cell.temp).toFixed(1)}°C</Text>
-              <Text style={{ color: "#fff" }}>Nem: {Number(cell.rh).toFixed(0)}%</Text>
-              <Text style={{ color: "#fff" }}>
-                Rüzgâr: {Number(cell.wind).toFixed(1)} m/s ({degToCompass(Number(cell.wind_dir))})
-              </Text>
-              <View style={{ height: 8 }} />
+              {/* Hücre Başlığı */}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>
+                  🔥 Hücre Detayları
+                </Text>
+                <TouchableOpacity 
+                  onPress={() => setCell(null)}
+                  style={{ backgroundColor: "#444", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}
+                >
+                  <Text style={{ color: "#fff", fontSize: 12 }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Konum Bilgisi */}
+              <View style={{ backgroundColor: "#333", padding: 6, borderRadius: 6, marginBottom: 8 }}>
+                <Text style={{ color: "#4ade80", fontWeight: "600", marginBottom: 2, fontSize: 11 }}>📍 Konum</Text>
+                <Text style={{ color: "#fff", fontSize: 10 }}>
+                  Koordinat: {Number(cell.coord?.[0] || cell.coordinates?.[0] || cell.lon || 0).toFixed(4)}, {Number(cell.coord?.[1] || cell.coordinates?.[1] || cell.lat || 0).toFixed(4)}
+                </Text>
+                <Text style={{ color: "#fff", fontSize: 10 }}>
+                  Bölge: {cell.aoiName ?? cell.aoiId ?? "Bilinmeyen"}
+                </Text>
+              </View>
+
+              {/* Risk Analizi */}
+              <View style={{ backgroundColor: "#333", padding: 6, borderRadius: 6, marginBottom: 8 }}>
+                <Text style={{ color: "#f59e0b", fontWeight: "600", marginBottom: 2, fontSize: 11 }}>⚠️ Yangın Riski</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
+                  <Text style={{ color: "#fff", fontSize: 10 }}>Risk Seviyesi: </Text>
+                  <Text style={{ 
+                    color: Number(cell.risk) > 0.7 ? "#ef4444" : Number(cell.risk) > 0.4 ? "#f59e0b" : "#22c55e",
+                    fontWeight: "700",
+                    fontSize: 10
+                  }}>
+                    {(Number(cell.risk) * 100).toFixed(1)}%
+                  </Text>
+                </View>
+                <Text style={{ color: "#fff", fontSize: 10 }}>
+                  Risk Kaynağı: {cell.risk_source || "heuristic"}
+                </Text>
+              </View>
+
+              {/* Hava Durumu */}
+              <View style={{ backgroundColor: "#333", padding: 6, borderRadius: 6, marginBottom: 8 }}>
+                <Text style={{ color: "#3b82f6", fontWeight: "600", marginBottom: 2, fontSize: 11 }}>🌤️ Hava Durumu</Text>
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: "#fff", fontSize: 9 }}>🌡️ Sıcaklık: {Number(cell.temp).toFixed(1)}°C</Text>
+                    <Text style={{ color: "#fff", fontSize: 9 }}>💧 Nem: {Number(cell.rh).toFixed(0)}%</Text>
+                    <Text style={{ color: "#fff", fontSize: 9 }}>🌡️ Hissedilen: {cell.feels_like ? Number(cell.feels_like).toFixed(1) + "°C" : "çekilemedi"}</Text>
+                    <Text style={{ color: "#fff", fontSize: 9 }}>💧 Çiğ Noktası: {cell.dew_point ? Number(cell.dew_point).toFixed(1) + "°C" : "çekilemedi"}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: "#fff", fontSize: 9 }}>💨 Rüzgar: {Number(cell.wind).toFixed(1)} m/s</Text>
+                    <Text style={{ color: "#fff", fontSize: 9 }}>🧭 Yön: {degToCompass(Number(cell.wind_dir))}</Text>
+                    <Text style={{ color: "#fff", fontSize: 9 }}>☁️ Bulut: {cell.cloud_cover ? Number(cell.cloud_cover).toFixed(0) + "%" : "çekilemedi"}</Text>
+                    <Text style={{ color: "#fff", fontSize: 9 }}>👁️ Görüş: {cell.visibility ? Number(cell.visibility).toFixed(1) + " km" : "çekilemedi"}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Basınç ve Yağış */}
+              <View style={{ backgroundColor: "#333", padding: 6, borderRadius: 6, marginBottom: 8 }}>
+                <Text style={{ color: "#06b6d4", fontWeight: "600", marginBottom: 2, fontSize: 11 }}>🌧️ Basınç & Yağış</Text>
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: "#fff", fontSize: 9 }}>📊 Basınç: {cell.pressure ? Number(cell.pressure).toFixed(0) + " hPa" : "çekilemedi"}</Text>
+                    <Text style={{ color: "#fff", fontSize: 9 }}>🌧️ Yağış: {cell.rain_1h ? Number(cell.rain_1h).toFixed(1) + " mm/h" : "çekilemedi"}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: "#fff", fontSize: 9 }}>❄️ Kar: {cell.snow_1h ? Number(cell.snow_1h).toFixed(1) + " mm/h" : "çekilemedi"}</Text>
+                    <Text style={{ color: "#fff", fontSize: 9 }}>☀️ UV İndeks: {cell.uv_index ? Number(cell.uv_index).toFixed(0) : "çekilemedi"}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Ek Bilgiler */}
+              <View style={{ backgroundColor: "#333", padding: 6, borderRadius: 6 }}>
+                <Text style={{ color: "#8b5cf6", fontWeight: "600", marginBottom: 2, fontSize: 11 }}>📊 Ek Bilgiler</Text>
+                <Text style={{ color: "#fff", fontSize: 9 }}>
+                  Saat Kaydırma: +{hourOffset}h
+                </Text>
+                <Text style={{ color: "#fff", fontSize: 9 }}>
+                  Veri Kaynağı: OpenWeather API
+                </Text>
+                <Text style={{ color: "#fff", fontSize: 9 }}>
+                  Hesaplama: Gelişmiş Heuristik
+                </Text>
+                <Text style={{ color: "#fff", fontSize: 9 }}>
+                  Hava Durumu: {cell.weather_desc || "çekilemedi"}
+                </Text>
+              </View>
             </>
           )}
+
+          {/* Birleşik AOI Ortalama */}
           {stats && (
-            <>
-              <Text style={{ color: "#9ae6b4", fontWeight: "700" }}>Birleşik AOI Ortalama</Text>
-              <Text style={{ color: "#9ae6b4" }}>Sıcaklık: {stats.tAvg.toFixed(1)}°C</Text>
-              <Text style={{ color: "#9ae6b4" }}>Nem: {stats.rhAvg.toFixed(0)}%</Text>
-              <Text style={{ color: "#9ae6b4" }}>
-                Rüzgâr: {stats.wsAvg.toFixed(1)} m/s ({degToCompass(stats.dirAvg)})
-              </Text>
-            </>
+            <View style={{ marginTop: 8, backgroundColor: "#1a4d3a", padding: 6, borderRadius: 6 }}>
+              <Text style={{ color: "#22c55e", fontWeight: "700", marginBottom: 2, fontSize: 11 }}>📈 Tüm Bölge Ortalaması</Text>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#9ae6b4", fontSize: 9 }}>🌡️ Ort. Sıcaklık: {stats.tAvg.toFixed(1)}°C</Text>
+                  <Text style={{ color: "#9ae6b4", fontSize: 9 }}>💧 Ort. Nem: {stats.rhAvg.toFixed(0)}%</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#9ae6b4", fontSize: 9 }}>💨 Ort. Rüzgar: {stats.wsAvg.toFixed(1)} m/s</Text>
+                  <Text style={{ color: "#9ae6b4", fontSize: 9 }}>🧭 Ort. Yön: {degToCompass(stats.dirAvg)}</Text>
+                </View>
+              </View>
+            </View>
           )}
         </View>
       )}
