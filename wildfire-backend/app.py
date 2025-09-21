@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-import httpx, time, asyncio, os, json
+import httpx, time, asyncio, os, json, base64
 from typing import Dict, Tuple, Optional, List
 from contextlib import asynccontextmanager
 from math import cos, sin, atan2, pi
@@ -15,6 +15,11 @@ RETRY_BASE_MS = 250
 
 def bucketize(v: float, step: float) -> float:
     return round(round(v / step) * step, 3)
+
+# ----------------- Roboflow API Configuration -----------------
+ROBOFLOW_API_URL = "https://detect.roboflow.com"
+ROBOFLOW_API_KEY = "XoNbKefV5xjEal7LJ744"
+ROBOFLOW_MODEL_ID = "smoke-detection-5tkur/3"
 
 # ----------------- App & HTTP client -----------------
 @asynccontextmanager
@@ -35,6 +40,54 @@ app.add_middleware(
 @app.get("/health")
 async def health():
     return {"ok": True, "ts": time.time()}
+
+# ----------------- Smoke Detection API -----------------
+@app.post("/smoke/detect")
+async def detect_smoke(file: UploadFile = File(...)):
+    """Roboflow API ile duman tespiti yap"""
+    try:
+        # Dosyayı oku
+        contents = await file.read()
+        
+        # Roboflow Detect API: https://detect.roboflow.com/{model}/{version}?api_key=KEY
+        detect_url = f"{ROBOFLOW_API_URL}/{ROBOFLOW_MODEL_ID}"
+        params = {"api_key": ROBOFLOW_API_KEY}
+        files = {"file": (file.filename or "upload.jpg", contents, file.content_type or "application/octet-stream")}
+        
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(detect_url, params=params, files=files)
+            response.raise_for_status()
+            result = response.json()
+        
+        # En yüksek confidence değerini bul
+        max_confidence = 0.0
+        detections = []
+        
+        if result and "predictions" in result:
+            for prediction in result["predictions"]:
+                if "confidence" in prediction:
+                    confidence = prediction["confidence"]
+                    max_confidence = max(max_confidence, confidence)
+                    detections.append({
+                        "confidence": confidence,
+                        "class": prediction.get("class", "smoke"),
+                        "bbox": prediction.get("bbox", {})
+                    })
+        
+        # Risk puanı = confidence * 100
+        risk_score = max_confidence * 100
+        
+        return {
+            "success": True,
+            "risk_score": risk_score,
+            "confidence": max_confidence,
+            "detections": detections,
+            "detection_count": len(detections),
+            "raw_result": result
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Smoke detection failed: {str(e)}")
 
 # ----------------- OpenWeather API Integration -----------------
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "e7e87950d4cbef19404e95fbad64d7d3")

@@ -26,6 +26,8 @@ type Props = {
   hotThreshold?: number; // ✅ yeni: hotspot eşiği (default 0.75)
   onRiskCellPress?: (p: any) => void;
   onViewportChange?: (bbox: BBox) => void;
+  onMapClick?: (lngLat: [number, number]) => void;
+  markers?: Array<{ id: string; coord: [number, number] }>;
 };
 
 export default function WebMap({
@@ -51,6 +53,10 @@ export default function WebMap({
       zoom: initialZoom,
     });
     m.addControl(new maplibregl.NavigationControl({ visualizePitch: true }));
+    // Genel tıklama
+    m.on("click", (e) => {
+      if (onMapClick) onMapClick([e.lngLat.lng, e.lngLat.lat]);
+    });
 
     // Viewport'i üst bileşene bildirmek istersek:
     const fireViewport = () => {
@@ -170,6 +176,57 @@ export default function WebMap({
     if (m.isStyleLoaded()) addOrUpdate();
     else m.once("load", addOrUpdate);
   }, [colored, riskOpacity, hotThreshold, onRiskCellPress]);
+
+  // 4) Marker layer (fire-station symbol)
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m) return;
+    const srcId = "custom-markers-src";
+    const layerId = "custom-markers-layer";
+
+    const fc: FeatureCollection<Point, any> = {
+      type: "FeatureCollection",
+      features: (markers || []).map((mk) => ({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: mk.coord },
+        properties: { id: mk.id },
+      })),
+    };
+
+    const ensureImage = () => {
+      if (!m.hasImage("fire-station")) {
+        const svg =
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32"><path fill="#ef4444" d="M12 2c2 3 6 4 6 9 0 3.866-3.134 7-7 7s-7-3.134-7-7c0-2.89 1.5-4.88 3.5-6.5C7.5 7 10 9 10 12a2 2 0 1 0 4 0c0-2-.5-3.5-2-6z"/><path fill="#fff" d="M11 11h2v6h-2z"/></svg>';
+        const img = new Image(32, 32);
+        img.onload = () => m.addImage("fire-station", img as any, { pixelRatio: 2 });
+        img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+      }
+    };
+
+    const addOrUpdate = () => {
+      ensureImage();
+      if (!m.getSource(srcId)) {
+        m.addSource(srcId, { type: "geojson", data: fc });
+      } else {
+        (m.getSource(srcId) as GeoJSONSource).setData(fc);
+      }
+      if (!m.getLayer(layerId)) {
+        m.addLayer({
+          id: layerId,
+          type: "symbol",
+          source: srcId,
+          layout: {
+            "icon-image": "fire-station",
+            "icon-size": 1,
+            "icon-allow-overlap": true,
+          },
+        });
+      }
+    };
+
+    if (m.isStyleLoaded()) addOrUpdate();
+    else m.once("load", addOrUpdate);
+  }, [markers]);
 
   return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
 }

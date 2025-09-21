@@ -12,6 +12,8 @@ export type MapUniversalProps = {
   hotThreshold?: number;          
   onRiskCellPress?: (p: any) => void;
   onViewportChange?: (bbox: BBox) => void;
+  onMapClick?: (lngLat: [number, number]) => void;
+  markers?: Array<{ id: string; coord: [number, number] }>;
 };
 
 export default function MapUniversal(props: MapUniversalProps) {
@@ -25,6 +27,8 @@ export default function MapUniversal(props: MapUniversalProps) {
         hotThreshold={props.hotThreshold}
         onRiskCellPress={props.onRiskCellPress}
         onViewportChange={props.onViewportChange}
+        onMapClick={props.onMapClick}
+        markers={props.markers}
       />
     );
   }

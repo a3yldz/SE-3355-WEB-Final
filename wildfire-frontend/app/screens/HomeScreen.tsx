@@ -62,7 +62,7 @@ export default function HomeScreen() {
       <View style={styles.uploadSection}>
         <TouchableOpacity 
           style={styles.uploadContainer}
-          onPress={Platform.OS !== 'web' ? pickMobile : undefined}
+          onPress={Platform.OS !== 'web' ? pickMobile : () => document.getElementById('file-upload')?.click()}
           activeOpacity={0.7}
         >
           {preview ? (
@@ -79,6 +79,7 @@ export default function HomeScreen() {
           
           {Platform.OS === "web" && (
             <input
+              id="file-upload"
               type="file"
               accept="image/*"
               onChange={onFileChangeWeb}

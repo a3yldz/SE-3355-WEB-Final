@@ -36,6 +36,13 @@ const degToCompass = (deg?: number) => {
 
 export default function MapScreen() {
   const { layerRiskVisible, riskOpacity, hourOffset, setHourOffset, toggleRisk } = useUIStore();
+  // Marker state (fire stations)
+  const [markers, setMarkers] = useState<Array<{ id: string; coord: [number, number] }>>([]);
+
+  const handleMapClick = (lngLat: [number, number]) => {
+    const id = `fs-${Date.now()}`;
+    setMarkers((prev) => [...prev, { id, coord: lngLat }]);
+  };
 
   // --- Çoklu AOI fetch (paralel) - Backend'den gerçek veri (OpenWeather entegrasyonu)
   const results = useRiskNowcasts(AREAS, hourOffset, 28, 28, "heuristic"); // OpenWeather ile gelişmiş heuristik
@@ -121,6 +128,8 @@ export default function MapScreen() {
         initialZoom={6.2} // 3 şehri birden görmek için biraz uzaklaş
         riskGeoJSON={paintedRisk}
         riskOpacity={riskOpacity}
+        markers={markers}
+        onMapClick={handleMapClick}
         onRiskCellPress={(p: any) => {
           // Koordinatları doğru şekilde geç
           const cellData = {
