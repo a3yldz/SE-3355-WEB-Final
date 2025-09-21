@@ -38,6 +38,8 @@ export default function WebMap({
   hotThreshold = 0.75,
   onRiskCellPress,
   onViewportChange,
+  onMapClick,
+  markers,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -52,10 +54,16 @@ export default function WebMap({
       center: initialCenter,
       zoom: initialZoom,
     });
+    // Shift + drag box-zoom, Shift + click algısını engelliyor; devre dışı bırak
+    m.boxZoom.disable();
     m.addControl(new maplibregl.NavigationControl({ visualizePitch: true }));
-    // Genel tıklama
+    // Shift + Click ile marker bırakma + HER TIKTA koordinat logu
     m.on("click", (e) => {
-      if (onMapClick) onMapClick([e.lngLat.lng, e.lngLat.lat]);
+      const ev = (e as any)?.originalEvent as MouseEvent | undefined;
+      console.log("🗺️ Map click:", { lng: e.lngLat.lng, lat: e.lngLat.lat, shift: !!ev?.shiftKey });
+      if (ev?.shiftKey && onMapClick) {
+        onMapClick([e.lngLat.lng, e.lngLat.lat]);
+      }
     });
 
     // Viewport'i üst bileşene bildirmek istersek:
@@ -103,6 +111,14 @@ export default function WebMap({
 
     const coerceNum = (v: any) => (typeof v === "string" ? Number(v) : v);
     const handleClick = (e: any) => {
+      // Shift + click ile marker bırakma (layer üstünde bile çalışsın)
+      const oe: MouseEvent | undefined = (e as any)?.originalEvent;
+      if (oe?.shiftKey && onMapClick) {
+        console.log("📍 Feature click (shift)", { lng: e.lngLat?.lng, lat: e.lngLat?.lat });
+        onMapClick([e.lngLat.lng, e.lngLat.lat]);
+        return;
+      }
+      console.log("ℹ️ Feature click", { lng: e.lngLat?.lng, lat: e.lngLat?.lat });
       if (!onRiskCellPress) return;
       const f = e.features?.[0] as any;
       const p = (f?.properties ?? {}) as RiskProps;
@@ -161,7 +177,7 @@ export default function WebMap({
         m.setFilter(hotLayerId, [">=", ["get", "risk"], hotThreshold]);
       }
 
-      // interactivity (tek handler, iki layer’a da bağla)
+      // interactivity: sadece feature üzerinde pointer, boş alanda default
       m.getCanvas().style.cursor = "";
       m.off("click", baseLayerId, handleClick as any);
       m.off("click", hotLayerId, handleClick as any);
@@ -193,18 +209,22 @@ export default function WebMap({
       })),
     };
 
-    const ensureImage = () => {
-      if (!m.hasImage("fire-station")) {
+    const ensureImage = async () => {
+      if (m.hasImage("fire-station")) return;
+      await new Promise<void>((resolve) => {
         const svg =
           '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32"><path fill="#ef4444" d="M12 2c2 3 6 4 6 9 0 3.866-3.134 7-7 7s-7-3.134-7-7c0-2.89 1.5-4.88 3.5-6.5C7.5 7 10 9 10 12a2 2 0 1 0 4 0c0-2-.5-3.5-2-6z"/><path fill="#fff" d="M11 11h2v6h-2z"/></svg>';
         const img = new Image(32, 32);
-        img.onload = () => m.addImage("fire-station", img as any, { pixelRatio: 2 });
+        img.onload = () => {
+          if (!m.hasImage("fire-station")) m.addImage("fire-station", img as any, { pixelRatio: 2 });
+          resolve();
+        };
         img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
-      }
+      });
     };
 
-    const addOrUpdate = () => {
-      ensureImage();
+    const addOrUpdate = async () => {
+      await ensureImage();
       if (!m.getSource(srcId)) {
         m.addSource(srcId, { type: "geojson", data: fc });
       } else {
@@ -225,7 +245,7 @@ export default function WebMap({
     };
 
     if (m.isStyleLoaded()) addOrUpdate();
-    else m.once("load", addOrUpdate);
+    else m.once("load", () => addOrUpdate());
   }, [markers]);
 
   return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
