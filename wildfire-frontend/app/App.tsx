@@ -3,7 +3,7 @@ import React from "react";
 import { SafeAreaView, View } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useNavStore } from "./store/useNavStore";
-import Sidebar from "./components/layout/Sidebar";
+import Topbar from "./components/layout/Topbar";
 import HomeScreen from "./screens/HomeScreen";
 import MapScreen from "./screens/MapScreen";
 import FireDeptScreen from "./screens/FireDeptScreen";
@@ -15,9 +15,9 @@ function getQueryClient() {
     g.__WILDFIRE_QC__ = new QueryClient({
       defaultOptions: {
         queries: {
-          staleTime: 60_000,           // useRiskNowcast ile uyumlu
-          retry: 1,                    // agresif değil
-          refetchOnWindowFocus: false, // RN'de gerek yok
+          staleTime: 60_000,
+          retry: 1,
+          refetchOnWindowFocus: false,
           refetchOnReconnect: true,
         },
       },
@@ -33,13 +33,11 @@ export default function App() {
   return (
     <QueryClientProvider client={qc}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <View style={{ flex: 1, flexDirection: "row" }}>
-          <Sidebar />
-          <View style={{ flex: 1, backgroundColor: colors.bg }}>
-            {route === "home" && <HomeScreen />}
-            {route === "map" && <MapScreen />}
-            {route === "fire" && <FireDeptScreen />}
-          </View>
+        <Topbar />
+        <View style={{ flex: 1, backgroundColor: colors.bg }}>
+          {route === "home" && <HomeScreen />}
+          {route === "map" && <MapScreen />}
+          {route === "fire" && <FireDeptScreen />}
         </View>
       </SafeAreaView>
     </QueryClientProvider>
