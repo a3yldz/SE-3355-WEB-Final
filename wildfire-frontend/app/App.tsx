@@ -7,6 +7,7 @@ import Topbar from "./components/layout/Topbar";
 import HomeScreen from "./screens/HomeScreen";
 import MapScreen from "./screens/MapScreen";
 import FireDeptScreen from "./screens/FireDeptScreen";
+import DonateScreen from "./screens/DonateScreen";
 import { colors } from "./theme";
 
 function getQueryClient() {
@@ -38,6 +39,7 @@ export default function App() {
           {route === "home" && <HomeScreen />}
           {route === "map" && <MapScreen />}
           {route === "fire" && <FireDeptScreen />}
+          {route === "donate" && <DonateScreen />}
         </View>
       </SafeAreaView>
     </QueryClientProvider>

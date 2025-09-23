@@ -51,6 +51,7 @@ export default function Topbar() {
         <NavBtn label="Ana Sayfa" to="home" />
         <NavBtn label="Risk Haritası" to="map" />
         <NavBtn label="İtfaiye & Sevk" to="fire" />
+        <NavBtn label="Birlikte Yeşer" to="donate" />
       </View>
     </View>
   );
