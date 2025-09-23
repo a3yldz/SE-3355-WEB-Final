@@ -1,3 +1,5 @@
+// app/components/MapUniversal/MapUniversal.tsx
+
 import React from "react";
 import { Platform, View, Text } from "react-native";
 import WebMap from "./WebMap";
@@ -29,6 +31,7 @@ export default function MapUniversal(props: MapUniversalProps) {
         onViewportChange={props.onViewportChange}
         onMapClick={props.onMapClick}
         markers={props.markers}
+        // maskGeoJSON prop'u buradan tamamen kaldırıldı.
       />
     );
   }
