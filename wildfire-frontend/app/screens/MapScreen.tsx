@@ -91,10 +91,45 @@ export default function MapScreen() {
         onRiskCellPress={(p: any) => setCell(p)}
       />
 
-      {/* Top Bar */}
+      {/* <<<<<<<<<<<<<<<< SAAT KAYDIRMA BUTONLARI BURAYA GERİ EKLENDİ >>>>>>>>>>>>>>>>> */}
+{/* Top Bar */}
       <View style={{ position: "absolute", top: 12, left: 12, right: 12, gap: 8 }}>
-        {/* ... Top Bar içeriği aynı ... */}
+        <View style={{ backgroundColor: "rgba(0,0,0,0.6)", borderRadius: 12, padding: 10 }}>
+          <Text style={{ color: "#fff", fontWeight: "700" }}>
+            AOI'ler: {AREAS.map(a => a.name).join(" • ")}
+          </Text>
+          <Text style={{ color: "#ddd", marginTop: 2 }}>Saat kaydır: şu an + {hourOffset}h</Text>
+          <Text style={{ color: "#9ae6b4", fontSize: 10, marginTop: 2 }}>
+            💡 Saat barı ile gelecekteki yangın riskini tahmin edin
+          </Text>
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+            {[0, 1, 3, 6, 12, 24].map((h) => (
+              <TouchableOpacity
+                key={h}
+                onPress={() => setHourOffset(h)}
+                style={{
+                  backgroundColor: hourOffset === h ? "#22c55e" : "#333",
+                  paddingVertical: 6,
+                  paddingHorizontal: 10,
+                  borderRadius: 8,
+                  marginBottom: 6,
+                }}
+              >
+                <Text style={{ color: "#fff" }}>+{h}h</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <TouchableOpacity
+            onPress={toggleRisk}
+            style={{ backgroundColor: "#111", paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }}
+          >
+            <Text style={{ color: "#fff" }}>{layerRiskVisible ? "Risk Katmanını Gizle" : "Risk Katmanını Göster"}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+      {/* <<<<<<<<<<<<<<<< EKLEME BİTTİ >>>>>>>>>>>>>>>>> */}
 
       {/* Legend */}
       {layerRiskVisible && (
@@ -103,82 +138,102 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* Backend durumu */}
+    {/* ======================= ÇÖZÜM BURADA BAŞLIYOR ======================= */}
+    {/*
+      Sağ alttaki TÜM elemanlar için TEK BİR kapsayıcı oluşturuyoruz.
+      - position: 'absolute' ile sağ alta sabitliyoruz.
+      - alignItems: 'flex-end' ile içindeki kartları sağa yaslıyoruz.
+      - gap: 8 ile kartlar arasında 8 piksellik dikey boşluk bırakıyoruz.
+    */}
+    <View style={{ position: 'absolute', bottom: 16, right: 12, alignItems: 'flex-end', gap: 8 }}>
+      
+      {/* Backend Durum Kartı */}
       {(anyLoading || anyError) && (
-        <View style={{ position: "absolute", bottom: 16, right: 12, backgroundColor: "rgba(0,0,0,0.6)", padding: 10, borderRadius: 10, maxWidth: 280 }}>
-          <Text style={{ color: "#fff", fontWeight: "700", marginBottom: 4 }}>
-            {anyLoading ? "Risk katmanları yükleniyor..." : "Backend'e bağlanılamadı"}
-          </Text>
-          <Text style={{ color: "#ddd" }}>
-            Mevcut platform ({Platform.OS}) için API adresi: {BASE_URL}
+        <View style={{ backgroundColor: "rgba(0,0,0,0.7)", padding: 10, borderRadius: 10, maxWidth: 280 }}>
+          <Text style={{ color: "#fff", fontWeight: "700" }}>
+            {anyLoading ? "🔄 Risk katmanları yükleniyor..." : "❌ Backend'e bağlanılamadı."}
           </Text>
         </View>
       )}
 
-      {/* <<<<<<<<<<<<<<<< DEĞİŞİKLİK BURADA YAPILDI >>>>>>>>>>>>>>>>>> */}
-      {/* Detaylı Bilgi Kartları (Hem Hücre hem de Bölge Ortalaması için) */}
-      {(cell || stats) && (
-        <View style={{ position: "absolute", bottom: 16, right: 12, backgroundColor: "rgba(0,0,0,0.9)", padding: 16, borderRadius: 12, width: 350, maxHeight: 400 }}>
-          {/* SADECE BİR HÜCRE SEÇİLDİYSE BU BÖLÜM GÖSTERİLİR */}
-{cell && (
-  <View style={{ position: "absolute", bottom: 16, right: 12, backgroundColor: "rgba(0,0,0,0.9)", padding: 16, borderRadius: 12, width: 350, maxHeight: 400, gap: 8 }}>
-    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>🔥 Hücre Detayları</Text>
-      <TouchableOpacity onPress={() => setCell(null)} style={{ backgroundColor: "#444", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-        <Text style={{ color: "#fff", fontSize: 12 }}>✕</Text>
-      </TouchableOpacity>
-    </View>
+      {/* Hücre Detay Kartı (Sadece 'cell' verisi varsa gösterilir) */}
+      {cell && (
+        // BU VIEW'DEN "position: absolute" KALDIRILDI. Pozisyonunu artık üstteki kapsayıcı belirliyor.
+        <View style={{ backgroundColor: "rgba(20,20,20,0.9)", padding: 16, borderRadius: 12, width: 350, gap: 8 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>🔥 Hücre Detayları</Text>
+            <TouchableOpacity onPress={() => setCell(null)} style={{ backgroundColor: "#444", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+              <Text style={{ color: "#fff", fontSize: 14 }}>✕</Text>
+            </TouchableOpacity>
+          </View>
 
-    {/* Konum Bilgisi */}
-    <View style={{ backgroundColor: "#333", padding: 6, borderRadius: 6 }}>
-      <Text style={{ color: "#4ade80", fontWeight: "600", fontSize: 11, marginBottom: 2 }}>📍 Konum</Text>
-      <Text style={{ color: "#fff", fontSize: 10 }}>Koordinat: {Number(cell.coord?.[0] || 0).toFixed(4)}, {Number(cell.coord?.[1] || 0).toFixed(4)}</Text>
-      <Text style={{ color: "#fff", fontSize: 10 }}>Bölge: {cell.aoiName ?? "Bilinmeyen"}</Text>
-    </View>
+          {/* Konum Bilgisi */}
+          <View style={{ backgroundColor: "#333", padding: 8, borderRadius: 8 }}>
+            <Text style={{ color: "#4ade80", fontWeight: "600", fontSize: 12, marginBottom: 4 }}>📍 Konum</Text>
+            <Text style={{ color: "#fff" }}>Koordinat: {Number(cell.coord?.[0] || 0).toFixed(4)}, {Number(cell.coord?.[1] || 0).toFixed(4)}</Text>
+            <Text style={{ color: "#fff" }}>Bölge: {cell.aoiName ?? "Bilinmeyen"}</Text>
+          </View>
 
-    {/* Yangın Riski Bilgisi */}
-    <View style={{ backgroundColor: "#333", padding: 6, borderRadius: 6 }}>
-      <Text style={{ color: "#f59e0b", fontWeight: "600", fontSize: 11, marginBottom: 2 }}>⚠️ Yangın Riski</Text>
-      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
-        <Text style={{ color: "#fff", fontSize: 10 }}>Risk Seviyesi: </Text>
-        <Text style={{ color: Number(cell.risk) > 0.7 ? "#ef4444" : Number(cell.risk) > 0.4 ? "#f59e0b" : "#22c55e", fontWeight: "700" }}>
-          {(Number(cell.risk) * 100).toFixed(1)}%
-        </Text>
-      </View>
-      {/* Yakıt Nemini düzeltiyoruz */}
-      <Text style={{ color: "#fff", fontSize: 10 }}>Yakıt Nemi: {(Number(cell.fuel_moisture) * 100).toFixed(0)}%</Text>
-      <Text style={{ color: "#fff", fontSize: 10 }}>Bitki Örtüsü: {cell.vegetation || "bilinmiyor"}</Text>
-    </View>
+          {/* Yangın Riski Bilgisi */}
+          <View style={{ backgroundColor: "#333", padding: 8, borderRadius: 8 }}>
+            <Text style={{ color: "#f59e0b", fontWeight: "600", fontSize: 12, marginBottom: 4 }}>⚠️ Yangın Riski</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
+              <Text style={{ color: "#fff" }}>Risk Seviyesi: </Text>
+              <Text style={{ color: Number(cell.risk) > 0.7 ? "#ef4444" : Number(cell.risk) > 0.4 ? "#f59e0b" : "#22c55e", fontWeight: "700" }}>
+                {(Number(cell.risk) * 100).toFixed(1)}%
+              </Text>
+            </View>
+            <Text style={{ color: "#fff" }}>Yakıt Nemi: {(Number(cell.fuel_moisture) * 100).toFixed(0)}%</Text>
+            <Text style={{ color: "#fff" }}>Bitki Örtüsü: {cell.vegetation || "bilinmiyor"}</Text>
+          </View>
 
-    {/* Hava Durumu Bilgisi */}
-    <View style={{ backgroundColor: "#333", padding: 6, borderRadius: 6 }}>
-      <Text style={{ color: "#3b82f6", fontWeight: "600", fontSize: 11, marginBottom: 2 }}>🌤️ Hava Durumu</Text>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <View>
-          <Text style={{ color: "#fff", fontSize: 9 }}>🌡️ Sıcaklık: {Number(cell.temp).toFixed(1)}°C</Text>
-          <Text style={{ color: "#fff", fontSize: 9 }}>💧 Nem: {Number(cell.rh).toFixed(0)}%</Text>
+          {/* Hava Durumu Bilgisi */}
+          <View style={{ backgroundColor: "#333", padding: 8, borderRadius: 8 }}>
+            <Text style={{ color: "#3b82f6", fontWeight: "600", fontSize: 12, marginBottom: 4 }}>🌤️ Hava Durumu</Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <View>
+                <Text style={{ color: "#fff" }}>🌡️ Sıcaklık: {Number(cell.temp).toFixed(1)}°C</Text>
+                <Text style={{ color: "#fff" }}>💧 Nem: {Number(cell.rh).toFixed(0)}%</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ color: "#fff" }}>💨 Rüzgar: {Number(cell.wind).toFixed(1)} m/s</Text>
+                <Text style={{ color: "#fff" }}>🧭 Yön: {degToCompass(cell.wind_dir)}</Text>
+              </View>
+            </View>
+          </View>
+          
+          {/* Çevresel Faktörler */}
+          <View style={{ backgroundColor: "#333", padding: 8, borderRadius: 8 }}>
+              <Text style={{ color: "#a78bfa", fontWeight: "600", fontSize: 12, marginBottom: 4 }}>🌍 Çevresel Faktörler</Text>
+              <Text style={{ color: "#fff" }}>
+                  Kuraklık Durumu: {cell.dry_days > 2 ? `${cell.dry_days} gündür yağış yok` : "Nemli"}
+              </Text>
+              <Text style={{ color: "#fff" }}>
+                  Arazi Eğimi Etkisi: {cell.slope_factor > 1.05 ? "Yüksek" : "Düşük"}
+              </Text>
+          </View>
+
+          {/* Bölge Ortalaması (Sadece 'stats' verisi varsa gösterilir) */}
+          {stats && (
+            <View style={{ marginTop: 4, backgroundColor: "#1a4d3a", padding: 8, borderRadius: 8 }}>
+              <Text style={{ color: "#22c55e", fontWeight: "700", marginBottom: 4, fontSize: 12 }}>📈 Tüm Bölge Ortalaması</Text>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#9ae6b4" }}>🌡️ Ort. Sıcaklık: {stats.tAvg.toFixed(1)}°C</Text>
+                  <Text style={{ color: "#9ae6b4" }}>💧 Ort. Nem: {stats.rhAvg.toFixed(0)}%</Text>
+                </View>
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <Text style={{ color: "#9ae6b4" }}>💨 Ort. Rüzgar: {stats.wsAvg.toFixed(1)} m/s</Text>
+                  <Text style={{ color: "#9ae6b4" }}>🧭 Ort. Yön: {degToCompass(stats.dirAvg)}</Text>
+                </View>
+              </View>
+            </View>
+          )}
         </View>
-        <View>
-          <Text style={{ color: "#fff", fontSize: 9 }}>💨 Rüzgar: {Number(cell.wind).toFixed(1)} m/s</Text>
-          {/* Rüzgar Yönünü düzeltiyoruz */}
-          <Text style={{ color: "#fff", fontSize: 9 }}>🧭 Yön: {degToCompass(cell.wind_dir)}</Text>
-        </View>
-      </View>
+      )}
     </View>
-    
-    {/* YENİ BİLGİ KARTI: Çevresel Faktörler */}
-    <View style={{ backgroundColor: "#333", padding: 6, borderRadius: 6 }}>
-        <Text style={{ color: "#a78bfa", fontWeight: "600", fontSize: 11, marginBottom: 2 }}>🌍 Çevresel Faktörler</Text>
-        <Text style={{ color: "#fff", fontSize: 10 }}>
-            Kuraklık Durumu: {cell.dry_days > 2 ? `${cell.dry_days} gündür yağış yok` : "Nemli"}
-        </Text>
-        <Text style={{ color: "#fff", fontSize: 10 }}>
-            Arazi Eğimi Etkisi: {cell.slope_factor > 1.05 ? "Yüksek" : "Düşük"}
-        </Text>
-    </View>
+    {/* ======================== ÇÖZÜMÜN SONU ======================== */}
   </View>
-)}        </View>
-      )}
-    </View>
-  );
+);
+
 }

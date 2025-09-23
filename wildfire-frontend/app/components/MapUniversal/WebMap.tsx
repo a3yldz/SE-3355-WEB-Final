@@ -1,4 +1,3 @@
-// app/components/MapUniversal/WebMap.tsx
 
 import React, { useEffect, useMemo, useRef } from "react";
 import maplibregl, { Map, GeoJSONSource } from "maplibre-gl";
@@ -6,7 +5,6 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection, Point } from "geojson";
 import { colorForRisk } from "../../utils/colors";
 
-// ---- Types
 type RiskProps = {
   risk: number;
   color?: string;
@@ -23,14 +21,13 @@ type BBox = { minLon: number; minLat: number; maxLon: number; maxLat: number };
 type Props = {
   initialCenter: [number, number];
   initialZoom?: number;
-  riskGeoJSON?: RiskFC; // Bu prop artık MapScreen'den filtrelenmiş olarak gelir
+  riskGeoJSON?: RiskFC;
   riskOpacity?: number;
   hotThreshold?: number;
   onRiskCellPress?: (p: any) => void;
   onViewportChange?: (bbox: BBox) => void;
   onMapClick?: (lngLat: [number, number]) => void;
   markers?: Array<{ id: string; coord: [number, number] }>;
-  // Not: maskGeoJSON prop'u artık kullanılmadığı için kaldırıldı.
 };
 
 export default function WebMap({
