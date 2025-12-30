@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 class PolygonRequest(BaseModel):
     type: str
@@ -14,3 +14,6 @@ class RiskPoint(BaseModel):
 class RiskResponse(BaseModel):
     type: str = "FeatureCollection"
     features: List[RiskPoint]
+    incident_created: Optional[bool] = False
+    incident_id: Optional[str] = None
+

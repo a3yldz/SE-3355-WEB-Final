@@ -1,20 +1,34 @@
 import numpy as np
 import asyncio
+from decimal import Decimal
+from typing import Optional
 from shapely.geometry import shape, Point
+from sqlalchemy.orm import Session
 from app.services.topography_service import TopographyService
 from app.services.drought_service import DroughtService
 from app.services.weather_service import OpenWeatherService
 from app.services.risk_calculator import AdvancedFireRiskCalculator
 from app.utils.interpolation import inverse_distance_weighting
 from app.models.risk import RiskPoint, RiskResponse
+from app.models.fire_incident import FireIncident
 
 weather_service = OpenWeatherService()
 risk_calculator = AdvancedFireRiskCalculator()
 topography_service = TopographyService()
 drought_service = DroughtService()
 
-async def get_risk_nowcast_for_polygon_service(polygon_request, hourOffset, provider, version):
+# Risk threshold for auto-creating fire incident (70%)
+HIGH_RISK_THRESHOLD = 0.70
+
+async def get_risk_nowcast_for_polygon_service(
+    polygon_request, 
+    hourOffset, 
+    provider, 
+    version,
+    db: Optional[Session] = None
+):
     polygon = shape(polygon_request.geometry)
+    polygon_name = polygon_request.properties.get("name", "Unknown")
     min_lon, min_lat, max_lon, max_lat = polygon.bounds
     slope_factor_task = topography_service.get_slope_factor((min_lon, min_lat, max_lon, max_lat))
     center_lon, center_lat = polygon.centroid.x, polygon.centroid.y
@@ -39,6 +53,8 @@ async def get_risk_nowcast_for_polygon_service(polygon_request, hourOffset, prov
     lon_points = np.linspace(min_lon, max_lon, nx)
     lat_points = np.linspace(min_lat, max_lat, ny)
     risk_features_to_add = []
+    high_risk_points = []  # Collect high risk points for incident creation
+    
     for p_lon in lon_points:
         for p_lat in lat_points:
             if Point(p_lon, p_lat).within(polygon):
@@ -46,6 +62,16 @@ async def get_risk_nowcast_for_polygon_service(polygon_request, hourOffset, prov
                 for key, data in data_sets.items():
                     point_features[key] = inverse_distance_weighting((p_lon, p_lat), data)
                 risk_value = risk_calculator.calculate_risk(point_features, slope_factor, drought_factor)
+                
+                # Track high risk points
+                if risk_value >= HIGH_RISK_THRESHOLD:
+                    high_risk_points.append({
+                        "lat": p_lat,
+                        "lon": p_lon,
+                        "risk": risk_value,
+                        "district": polygon_name
+                    })
+                
                 risk_features_to_add.append(RiskPoint(
                     geometry={"type": "Point", "coordinates": [p_lon, p_lat]},
                     properties={
@@ -58,4 +84,43 @@ async def get_risk_nowcast_for_polygon_service(polygon_request, hourOffset, prov
                         "dry_days": dry_days, "provider": f"{provider}:v{version}"
                     }
                 ))
-    return RiskResponse(features=risk_features_to_add)
+    
+    # Auto-create fire incident for highest risk point if above threshold
+    incident_created = False
+    incident_id = None
+    
+    if db and high_risk_points:
+        # Get the highest risk point
+        highest_risk = max(high_risk_points, key=lambda x: x["risk"])
+        
+        # Check if there's already an active incident in this district
+        existing_incident = db.query(FireIncident).filter(
+            FireIncident.district == highest_risk["district"],
+            FireIncident.status == "active"
+        ).first()
+        
+        if not existing_incident:
+            # Create new incident
+            fire_incident = FireIncident(
+                district=highest_risk["district"],
+                address=f"Auto-detected high risk area ({highest_risk['risk']*100:.1f}%)",
+                latitude=Decimal(str(highest_risk["lat"])),
+                longitude=Decimal(str(highest_risk["lon"])),
+                status="active"
+            )
+            db.add(fire_incident)
+            db.commit()
+            db.refresh(fire_incident)
+            incident_created = True
+            incident_id = str(fire_incident.id)
+            print(f"🔥 Auto-created fire incident in {highest_risk['district']} - Risk: {highest_risk['risk']*100:.1f}%")
+    
+    response = RiskResponse(features=risk_features_to_add)
+    
+    # Add incident info to response if created
+    if incident_created:
+        response.incident_created = True
+        response.incident_id = incident_id
+    
+    return response
+
