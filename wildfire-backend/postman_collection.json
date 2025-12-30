@@ -1,0 +1,265 @@
+{
+    "info": {
+        "name": "Wildfire Backend API",
+        "description": "CRUD API for Wildfire Detection System",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8001"
+        }
+    ],
+    "item": [
+        {
+            "name": "Health",
+            "item": [
+                {
+                    "name": "Health Check",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/health"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Fire Reports",
+            "item": [
+                {
+                    "name": "Create Fire Report",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}/fire-reports",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"title\": \"Test Fire Report\",\n  \"description\": \"A fire was spotted in the forest\",\n  \"location\": \"Istanbul, Kadikoy\",\n  \"image_url\": \"https://example.com/fire.jpg\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Get All Fire Reports",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/fire-reports"
+                    }
+                },
+                {
+                    "name": "Get Fire Report by ID",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/fire-reports/1"
+                    }
+                },
+                {
+                    "name": "Update Fire Report",
+                    "request": {
+                        "method": "PUT",
+                        "url": "{{baseUrl}}/fire-reports/1",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"status\": \"confirmed\",\n  \"description\": \"Updated description\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Delete Fire Report",
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{baseUrl}}/fire-reports/1"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Fire Incidents",
+            "item": [
+                {
+                    "name": "Create Fire Incident",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}/fire-incidents",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"district\": \"Kadikoy\",\n  \"address\": \"Moda Street 123\",\n  \"latitude\": 40.9876,\n  \"longitude\": 29.1234,\n  \"status\": \"active\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Get All Fire Incidents",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/fire-incidents"
+                    }
+                },
+                {
+                    "name": "Get Fire Incident by ID",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/fire-incidents/{{incidentId}}"
+                    }
+                },
+                {
+                    "name": "Update Fire Incident",
+                    "request": {
+                        "method": "PUT",
+                        "url": "{{baseUrl}}/fire-incidents/{{incidentId}}",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"status\": \"resolved\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Delete Fire Incident",
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{baseUrl}}/fire-incidents/{{incidentId}}"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Fire Stations",
+            "item": [
+                {
+                    "name": "Create Fire Station",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}/fire-stations",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Kadikoy Fire Station\",\n  \"district\": \"Kadikoy\",\n  \"latitude\": 40.9876,\n  \"longitude\": 29.1234,\n  \"status\": \"available\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Get All Fire Stations",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/fire-stations"
+                    }
+                },
+                {
+                    "name": "Get Fire Station by ID",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/fire-stations/{{stationId}}"
+                    }
+                },
+                {
+                    "name": "Update Fire Station",
+                    "request": {
+                        "method": "PUT",
+                        "url": "{{baseUrl}}/fire-stations/{{stationId}}",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"status\": \"busy\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Delete Fire Station",
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{baseUrl}}/fire-stations/{{stationId}}"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Smoke Detection",
+            "item": [
+                {
+                    "name": "Detect Smoke (Upload Image)",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}/smoke/detect",
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "file",
+                                    "type": "file",
+                                    "src": ""
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get All Smoke Detections",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/smoke/detections"
+                    }
+                },
+                {
+                    "name": "Get Smoke Detection by ID",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/smoke/detections/{{detectionId}}"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Risk Analysis",
+            "item": [
+                {
+                    "name": "Risk Nowcast by Polygon",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}/risk/nowcast_by_polygon",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"type\": \"Feature\",\n  \"geometry\": {\n    \"type\": \"Polygon\",\n    \"coordinates\": [[[29.0, 41.0], [29.1, 41.0], [29.1, 41.1], [29.0, 41.1], [29.0, 41.0]]]\n  },\n  \"properties\": {\n    \"name\": \"Test Area\"\n  }\n}"
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

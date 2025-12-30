@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import httpx
 import time
 
-from app.routes import health, smoke, risk, auth, admin
+from app.routes import health, smoke, risk, fire_reports, fire_incidents, fire_stations, auth, admin
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -18,9 +18,14 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 
 # Include routers
 def include_routers(app: FastAPI):
+    # Mevcut route'lar
     app.include_router(health.router)
     app.include_router(smoke.router)
     app.include_router(risk.router)
+    # Yeni CRUD route'lar
+    app.include_router(fire_reports.router)
+    app.include_router(fire_incidents.router)
+    app.include_router(fire_stations.router)
     app.include_router(auth.router)
     app.include_router(admin.router)
 

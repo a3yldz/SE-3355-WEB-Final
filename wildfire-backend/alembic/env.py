@@ -4,7 +4,7 @@ import os
 
 from logging.config import fileConfig
 from app.db import Base
-from app.models import user, fire_station, fire_incident, fire_report, smoke_detection
+from app.models import user, fire_station, fire_incident, smoke_detection, fire_report
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 

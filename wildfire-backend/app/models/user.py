@@ -4,6 +4,9 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
 from app.db import Base
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class User(Base):
     __tablename__ = "users"
@@ -15,3 +18,10 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     fire_incidents = relationship("FireIncident", back_populates="reported_by_user")
     reports = relationship("FireReport", back_populates="user")
+
+    @staticmethod
+    def hash_password(password: str) -> str:
+        return pwd_context.hash(password)
+
+    def verify_password(self, password: str) -> bool:
+        return pwd_context.verify(password, self.password_hash)
