@@ -43,7 +43,6 @@ export default function WebMap({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
 
-  // 1) Harita başlatma (değişiklik yok)
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -79,10 +78,8 @@ export default function WebMap({
       m.remove();
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 2) Risk verisini renklendirme (değişiklik yok)
   const colored: RiskFC = useMemo(() => {
     if (!riskGeoJSON) return { type: "FeatureCollection", features: [] };
     const features = riskGeoJSON.features.map((f: any) => {
@@ -93,7 +90,6 @@ export default function WebMap({
     return { type: "FeatureCollection", features };
   }, [riskGeoJSON]);
 
-  // 3) Kaynakları ve Katmanları yöneten ana useEffect (BASİTLEŞTİRİLDİ)
   useEffect(() => {
     const m = mapRef.current;
     if (!m) return;
@@ -103,20 +99,20 @@ export default function WebMap({
     const clickablePointsLayerId = "risk-clickable-points";
 
     const handleClick = (e: any) => {
-        if (!onRiskCellPress) return;
-        const f = e.features?.[0] as any;
-        if (!f) return;
-        const p = (f.properties ?? {}) as RiskProps;
-        const coerceNum = (v: any) => (typeof v === "string" ? Number(v) : v);
-        onRiskCellPress({
-          ...p,
-          risk: coerceNum(p.risk),
-          temp: coerceNum(p.temp),
-          rh: coerceNum(p.rh),
-          wind: coerceNum(p.wind),
-          wind_dir: coerceNum(p.wind_dir),
-          coord: f?.geometry?.coordinates,
-        });
+      if (!onRiskCellPress) return;
+      const f = e.features?.[0] as any;
+      if (!f) return;
+      const p = (f.properties ?? {}) as RiskProps;
+      const coerceNum = (v: any) => (typeof v === "string" ? Number(v) : v);
+      onRiskCellPress({
+        ...p,
+        risk: coerceNum(p.risk),
+        temp: coerceNum(p.temp),
+        rh: coerceNum(p.rh),
+        wind: coerceNum(p.wind),
+        wind_dir: coerceNum(p.wind_dir),
+        coord: f?.geometry?.coordinates,
+      });
     };
 
     const addOrUpdateLayers = () => {
@@ -126,7 +122,6 @@ export default function WebMap({
         (m.getSource(riskSourceId) as GeoJSONSource).setData(colored);
       }
 
-      // 1. Heatmap Katmanı
       if (!m.getLayer(heatmapLayerId)) {
         m.addLayer({
           id: heatmapLayerId, type: "heatmap", source: riskSourceId, maxzoom: 14,
@@ -134,17 +129,14 @@ export default function WebMap({
             "heatmap-weight": ["get", "risk"],
             "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 5, 1, 9, 2.5],
             "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(0,0,255,0)", 0.1, "royalblue", 0.3, "cyan", 0.5, "lime", 0.7, "yellow", 1, "red"],
-            "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 5, 20, 12, 50], // Yarıçapı biraz artırarak daha dolgun bir görünüm elde edebiliriz
+            "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 5, 20, 12, 50],
             "heatmap-opacity": riskOpacity,
           },
         });
       } else {
         m.setPaintProperty(heatmapLayerId, "heatmap-opacity", riskOpacity);
       }
-      
-      // MASK KATMANI LOGIĞI TAMAMEN KALDIRILDI, ÇÜNKÜ GEREKLİ DEĞİL.
 
-      // 2. Görünmez Tıklama Katmanı
       if (!m.getLayer(clickablePointsLayerId)) {
         m.addLayer({
           id: clickablePointsLayerId, type: "circle", source: riskSourceId,
@@ -152,7 +144,6 @@ export default function WebMap({
         });
       }
 
-      // Interactivity
       m.getCanvas().style.cursor = "";
       m.off("click", clickablePointsLayerId, handleClick);
       m.on("click", clickablePointsLayerId, handleClick);
@@ -167,7 +158,6 @@ export default function WebMap({
     }
   }, [colored, riskOpacity, onRiskCellPress, onMapClick]);
 
-  // 4) Marker katmanı (değişiklik yok)
   useEffect(() => {
     const m = mapRef.current;
     if (!m) return;

@@ -47,10 +47,10 @@ export default function Topbar() {
       </View>
 
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <NavBtn label="Ana Sayfa" to="home" />
-        <NavBtn label="Risk Haritası" to="map" />
-        <NavBtn label="İtfaiye & Sevk" to="fire" />
-        <NavBtn label="Birlikte Yeşer" to="donate" />
+        <NavBtn label="Home" to="home" />
+        <NavBtn label="Risk Map" to="map" />
+        <NavBtn label="Fire Dept & Dispatch" to="fire" />
+        <NavBtn label="Grow Together" to="donate" />
       </View>
     </View>
   );

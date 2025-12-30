@@ -1,4 +1,3 @@
-// app/hooks/useRiskAlerts.ts
 import { useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { BASE_URL } from "../utils/config";
@@ -58,12 +57,11 @@ export function useRiskAlerts(
       const data: any = queries[idx]?.data;
       if (!data) return;
 
-      // Tüm hücreler (eşiksiz) + ilçe/bölge enrich
       const all = (data.features || []).map((f: any) => {
         const coord = f.geometry?.coordinates as [number, number] | undefined;
         const lon = coord?.[0];
         const lat = coord?.[1];
-        const d = lookupDistrict(lon, lat); // ← ilçe/bölge eşle
+        const d = lookupDistrict(lon, lat);
 
         return {
           ...f.properties,
@@ -75,19 +73,16 @@ export function useRiskAlerts(
           coord,
           aoiId: a.id,
           aoiName: a.name,
-          // ✅ yeni alanlar:
-          districtName: d?.label,     // "Istanbul / Kadıköy" gibi
-          districtOnly: d?.district,  // "Kadıköy"
-          cityName: d?.city,          // "Istanbul"
-          region: d?.region,          // "Kuzey/Güney" vs (varsa)
+          districtName: d?.label,
+          districtOnly: d?.district,
+          cityName: d?.city,
+          region: d?.region,
         };
       });
 
-      // Top-10 = eşiksiz, sadece en yüksek 10
       const sortedAll = all.slice().sort((x: any, y: any) => y.risk - x.risk);
       perCity[a.id] = sortedAll.slice(0, 10);
 
-      // Acil = eşik üstü
       const hot = all.filter(
         (p: any) => typeof p.risk === "number" && p.risk >= threshold
       );

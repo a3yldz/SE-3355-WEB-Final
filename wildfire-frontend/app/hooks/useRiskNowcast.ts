@@ -1,30 +1,25 @@
-// app/hooks/useRiskNowcasts.ts
-
 import { useQuery } from "@tanstack/react-query";
-import { BASE_URL } from "../utils/config"; // 1. DEĞİŞİKLİK: BASE_URL'i dinamik olarak alan config dosyasından import et
+import { BASE_URL } from "../utils/config";
 
 export type BBox = { minLon: number; minLat: number; maxLon: number; maxLat: number };
 export type Area = { id: string; name: string; bbox: BBox };
 
-// <<<<<<<<<<<<<<<<<<<<<<<< DEĞİŞİKLİK BURADA >>>>>>>>>>>>>>>>>>>>>>>>
 export function useRiskNowcastsByPolygon(
   cityPolygons: any[],
   hourOffset = 0,
   provider = "heuristic",
-  version = 1 // 2. DEĞİŞİKLİK: Versiyon parametresini hook'a ekliyoruz
+  version = 1
 ) {
   return useQuery({
-    // 3. DEĞİŞİKLİK: queryKey'i yeni parametreyi içerecek şekilde güncelliyoruz
     queryKey: ["risk-nowcast-by-polygon", cityPolygons.map(p => p.properties.name), hourOffset, provider, version],
-    
+
     queryFn: async () => {
-      console.log(`Risk verisi çekiliyor: ${cityPolygons.length} poligon için...`);
-      
+      console.log(`Fetching risk data for ${cityPolygons.length} polygons...`);
+
       const promises = cityPolygons.map(async (polygon) => {
-        // 4. DEĞİŞİKLİK: Fetch URL'sini yeni versiyon parametresini gönderecek şekilde güncelliyoruz
         const url = `${BASE_URL}/risk/nowcast_by_polygon?hourOffset=${hourOffset}&provider=${provider}&version=${version}`;
-        
-        console.log(`İstek gönderiliyor: POST ${url}`); // Hata ayıklama için URL'yi logla
+
+        console.log(`Sending request: POST ${url}`);
 
         const response = await fetch(url, {
           method: 'POST',
@@ -36,18 +31,18 @@ export function useRiskNowcastsByPolygon(
           throw new Error(`HTTP ${response.status} for ${polygon.properties.name}`);
         }
         const data = await response.json();
-        
+
         data.features.forEach((feature: any) => {
           feature.properties.aoiName = polygon.properties.name;
-          feature.properties.aoiId = polygon.properties.name.toLowerCase().replace('İ', 'i');
+          feature.properties.aoiId = polygon.properties.name.toLowerCase().replace('I', 'i');
         });
-        
+
         return data.features;
       });
 
       const allFeatures = (await Promise.all(promises)).flat();
-      
-      console.log(`Toplam ${allFeatures.length} risk noktası alındı.`);
+
+      console.log(`Total ${allFeatures.length} risk points received.`);
       return { type: "FeatureCollection", features: allFeatures };
     },
 

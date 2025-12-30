@@ -1,4 +1,3 @@
-// app/utils/district.ts
 import { point, booleanPointInPolygon } from "@turf/turf";
 import trDistricts from "../data/tr_districts.json";
 
@@ -17,7 +16,6 @@ export type DistrictLookup = {
   label: string;
 };
 
-/** (lon, lat) -> "Istanbul / Kadıköy" (+ region) */
 export function lookupDistrict(lon?: number, lat?: number): DistrictLookup | null {
   if (typeof lon !== "number" || typeof lat !== "number") return null;
 
@@ -25,12 +23,11 @@ export function lookupDistrict(lon?: number, lat?: number): DistrictLookup | nul
 
   for (const f of FEATURES) {
     if (!f?.geometry) continue;
-    // turf tipleri/GeoJSON tipleri küçük uyumsuz olabiliyor, runtime güvenli:
     // @ts-ignore
     if (booleanPointInPolygon(pt, f)) {
       const { city, district, region } = f.properties ?? {};
       const label =
-        [city, district].filter(Boolean).join(" / ") || "Bilinmeyen İlçe";
+        [city, district].filter(Boolean).join(" / ") || "Unknown District";
       return { city, district, region, label };
     }
   }

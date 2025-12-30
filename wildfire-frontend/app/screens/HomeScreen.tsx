@@ -1,9 +1,7 @@
-// app/screens/HomeScreen.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
-  Image,
   ImageBackground,
   Platform,
   TouchableOpacity,
@@ -12,11 +10,13 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Image,
 } from "react-native";
 import { useNavStore } from "../store/useNavStore";
 import { useSmokeDetectMock } from "../hooks/useSmokeDetectMock";
 import { LinearGradient } from "expo-linear-gradient";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { BlurView } from 'expo-blur';
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -24,19 +24,28 @@ export default function HomeScreen() {
   const go = useNavStore((s) => s.go);
   const detect = useSmokeDetectMock();
   const [preview, setPreview] = useState<string | null>(null);
-  const fade = useState(new Animated.Value(0))[0];
-  const slide = useState(new Animated.Value(30))[0];
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fade, { toValue: 1, duration: 700, useNativeDriver: true }),
-      Animated.timing(slide, {
+      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 700,
-        easing: Easing.out(Easing.exp),
+        duration: 800,
+        easing: Easing.out(Easing.back(1.5)),
         useNativeDriver: true,
       }),
     ]).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      ])
+    ).start();
   }, []);
 
   const pickMobile = async () => {
@@ -49,11 +58,12 @@ export default function HomeScreen() {
         quality: 0.8,
       });
       if (res.canceled || !res.assets?.[0]) return;
+
       const asset = res.assets[0];
       setPreview(asset.uri);
       await detect.mutateAsync({ file: new File([], "mobile.jpg") as any });
     } catch {
-      alert("Mobil seçici için expo-image-picker eklenmeli.");
+      alert("expo-image-picker is required for mobile picker.");
     }
   };
 
@@ -65,348 +75,416 @@ export default function HomeScreen() {
     await detect.mutateAsync({ file });
   };
 
-  const getScoreColor = (score: number | undefined) => {
-    if (!score) return "#9aa1ab";
-    if (score >= 0.7) return "#ef4444";
-    if (score >= 0.4) return "#f59e0b";
-    return "#22c55e";
-  };
-
   const score = detect.data?.score_smoke ?? 0;
   const scorePct = Math.round(score * 100);
-  const scoreColor = getScoreColor(score);
+
+  const getStatusColor = () => {
+    if (scorePct >= 70) return { main: "#ef4444", bg: "rgba(239, 68, 68, 0.2)", label: "CRITICAL RISK" };
+    if (scorePct >= 40) return { main: "#f59e0b", bg: "rgba(245, 158, 11, 0.2)", label: "MODERATE RISK" };
+    return { main: "#22c55e", bg: "rgba(34, 197, 94, 0.2)", label: "SAFE / LOW RISK" };
+  };
+
+  const status = getStatusColor();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* HERO */}
-      <View style={styles.heroWrap}>
-        <ImageBackground
-          source={require("../../assets/home-hero.jpg")}
-          style={styles.heroBg}
-          imageStyle={styles.heroBgImage}
-          resizeMode="cover"
-        >
-          <LinearGradient
-            colors={["rgba(6,34,20,0.85)", "rgba(6,34,20,0.70)"]}
-            style={StyleSheet.absoluteFill}
-          />
-          <Animated.View
-            style={[styles.heroContent, { opacity: fade, transform: [{ translateY: slide }] }]}
-          >
-            <Text style={styles.projectName}>GreenTopia</Text>
-            <Text style={styles.heroTitle}>Akıllı Koruma, Yeşil Yarınlar</Text>
-            <Text style={styles.heroParagraph}>
-              Geleceğimizi tehdit eden orman yangınlarını önceden durduruyoruz. GreenTopia,
-              hava verilerini anlık analiz eder, dumanı erken tespit eder ve yayılımı simüle eder.
-            </Text>
-            <TouchableOpacity style={styles.ctaPrimary} onPress={() => go("map")}>
-              <MaterialIcons name="eco" size={18} color="#0b2b1a" />
-              <Text style={styles.ctaPrimaryText}>Risk Haritasını Aç</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </ImageBackground>
-      </View>
+    <View style={styles.mainContainer}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-      {/* FLOW */}
-      <View style={styles.flowSection}>
-        <View style={styles.flowRow}>
-          {[
-            { icon: "photo-library", title: "Fotoğraf Yükle", desc: "Yangın şüphesi görselini ekle" },
-            { icon: "search", title: "Duman Analizi", desc: "Yapay zekâ ile inceleme" },
-            { icon: "timeline", title: "Yayılım Simülasyonu", desc: "Yangının olası rotası" },
-            { icon: "map", title: "Müdahale Planı", desc: "Harita üzerinde yönlendir" },
-          ].map((step, idx, arr) => (
-            <React.Fragment key={idx}>
-              <View style={styles.flowStep}>
-                <View style={styles.flowIcon}>
-                  <MaterialIcons name={step.icon as any} size={20} color="#d7f5e6" />
-                </View>
-                <Text style={styles.flowTitle}>{step.title}</Text>
-                <Text style={styles.flowDesc}>{step.desc}</Text>
+        <View style={styles.heroWrapper}>
+          <ImageBackground
+            source={require("../../assets/home-hero.jpg")}
+            style={styles.heroBackground}
+            imageStyle={{ opacity: 0.6 }}
+          >
+            <LinearGradient
+              colors={["transparent", "#0f172a"]}
+              style={styles.heroGradient}
+            />
+
+            <Animated.View style={[styles.heroContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+              <View style={styles.badgeContainer}>
+                <View style={styles.activeDot} />
+                <Text style={styles.badgeText}>AI SYSTEM ONLINE</Text>
               </View>
-              {idx < arr.length - 1 && (
-                <View style={styles.flowConnector}>
-                  <Text style={styles.flowArrow}>→</Text>
+
+              <Text style={styles.heroTitle}>
+                Smart Protection for{"\n"}
+                <Text style={{ color: "#4ade80" }}>Greener Tomorrows</Text>
+              </Text>
+
+              <Text style={styles.heroSubtitle}>
+                Advanced wildfire prevention utilizing real-time satellite data,
+                AI smoke detection, and predictive risk modeling.
+              </Text>
+
+              <View style={styles.heroButtons}>
+                <TouchableOpacity style={styles.btnPrimary} onPress={() => go("map")}>
+                  <LinearGradient
+                    colors={["#22c55e", "#16a34a"]}
+                    style={styles.btnGradient}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  >
+                    <MaterialCommunityIcons name="radar" size={20} color="#fff" />
+                    <Text style={styles.btnText}>Open Risk Map</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          </ImageBackground>
+        </View>
+
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionHeader}>SYSTEM CAPABILITIES</Text>
+          <View style={styles.gridContainer}>
+            <FeatureCard icon="image-search-outline" title="AI Vision" desc="99.8% smoke accuracy" color="#38bdf8" />
+            <FeatureCard icon="weather-windy" title="Spread Sim" desc="Real-time wind models" color="#a78bfa" />
+            <FeatureCard icon="map-marker-radius" title="Geo-Fencing" desc="Instant alert zones" color="#f472b6" />
+            <FeatureCard icon="satellite-variant" title="Satellite" desc="24/7 Thermal monitor" color="#facc15" />
+          </View>
+        </View>
+
+        <View style={styles.analysisContainer}>
+          <LinearGradient colors={["rgba(30, 41, 59, 0.5)", "rgba(15, 23, 42, 0.8)"]} style={styles.analysisCard}>
+            <View style={styles.cardHeader}>
+              <MaterialIcons name="analytics" size={24} color="#4ade80" />
+              <Text style={styles.cardTitle}>AI Smoke Analysis</Text>
+            </View>
+
+            <Text style={styles.cardDesc}>
+              Upload a photo from the field. Our neural engine will analyze pixel density and color patterns to detect smoke.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.uploadArea}
+              onPress={Platform.OS !== "web" ? pickMobile : undefined}
+              activeOpacity={0.8}
+            >
+              {preview ? (
+                <Image source={{ uri: preview }} style={styles.previewImage} />
+              ) : (
+                <View style={styles.placeholderContent}>
+                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                    <MaterialCommunityIcons name="cloud-upload-outline" size={48} color="#94a3b8" />
+                  </Animated.View>
+                  <Text style={styles.uploadTitle}>Tap to Upload Image</Text>
+                  <Text style={styles.uploadSub}>Supports JPG, PNG (Max 5MB)</Text>
                 </View>
               )}
-            </React.Fragment>
-          ))}
-        </View>
-      </View>
 
-      {/* ANALYSIS */}
-      <View style={styles.analysisSection}>
-        <Text style={styles.sectionHeadingLight}>Erken Tespit Ormanları Kurtarır</Text>
-        <Text style={styles.sectionSub}>
-          Yangını başlamadan durdurmak için dumanı erken tespit edin. Riskleri önceden görün.
-        </Text>
+              {Platform.OS === "web" && (
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={onFileChangeWeb}
+                  style={styles.webInput as any}
+                />
+              )}
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.uploadDrop}
-          onPress={Platform.OS !== "web" ? pickMobile : undefined}
-          activeOpacity={0.85}
-        >
-          {preview ? (
-            <Image source={{ uri: preview }} style={styles.previewImage} />
-          ) : (
-            <View style={styles.uploadPlaceholder}>
-              <MaterialIcons name="cloud-upload" size={40} color="#1f5b3e" />
-              <Text style={styles.uploadText}>Fotoğrafınızı buradan yükleyin</Text>
-              <Text style={styles.uploadSub}>JPEG, PNG — Maks. 5MB</Text>
-            </View>
-          )}
+            {detect.isPending ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Analyzing patterns...</Text>
+              </View>
+            ) : preview && (
+              <View style={styles.resultDashboard}>
+                <View style={[styles.resultBadge, { backgroundColor: status.bg, borderColor: status.main }]}>
+                  <Text style={[styles.resultBadgeText, { color: status.main }]}>{status.label}</Text>
+                </View>
 
-          {Platform.OS === "web" && (
-            <input
-              type="file"
-              accept="image/*"
-              onChange={onFileChangeWeb}
-              style={styles.coverInput as any}
-            />
-          )}
-        </TouchableOpacity>
+                <View style={styles.scoreRow}>
+                  <View style={styles.scoreMeta}>
+                    <Text style={styles.scoreLabel}>CONFIDENCE SCORE</Text>
+                    <Text style={[styles.scoreBig, { color: status.main }]}>{scorePct}<Text style={{ fontSize: 20 }}>/100</Text></Text>
+                  </View>
+                  <View style={styles.barContainer}>
+                    <View style={[styles.barFill, { width: `${scorePct}%`, backgroundColor: status.main }]} />
+                  </View>
+                </View>
 
-        <View style={styles.actionRowOnlyMap}>
-          <TouchableOpacity onPress={() => go("map")} style={styles.btnOutline}>
-            <MaterialIcons name="map" size={18} color="#cbd5cf" />
-            <Text style={styles.btnOutlineText}>Risk Haritasını Gör</Text>
-          </TouchableOpacity>
+                <Text style={styles.disclaimer}>
+                  * This is an AI estimation. Always verify with local fire authorities.
+                </Text>
+              </View>
+            )}
+          </LinearGradient>
         </View>
 
-        {/* RESULT */}
-        <View style={styles.resultCard}>
-          <Text style={styles.resultTitle}>Duman Tespit Skoru</Text>
-          <View style={styles.chartRow}>
-            <Text style={styles.chartEdge}>0</Text>
-            <View style={styles.chartTrack}>
-              <LinearGradient
-                colors={
-                  scorePct >= 70
-                    ? ["#ef4444", "#f97316"]
-                    : scorePct >= 40
-                    ? ["#f59e0b", "#fbbf24"]
-                    : ["#22c55e", "#10b981"]
-                }
-                style={[styles.chartFill, { width: `${scorePct}%` }]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              />
-              {[0, 25, 50, 75, 100].map((t) => (
-                <View key={t} style={[styles.tick, { left: `${t}%` }]} />
-              ))}
-            </View>
-            <Text style={styles.chartEdge}>100</Text>
-          </View>
-
-          <View style={styles.chartMeta}>
-            <Text style={[styles.scoreValue, { color: scoreColor }]}>{scorePct}</Text>
-            <Text style={styles.scoreUnit}>/100</Text>
-            <View style={styles.riskPill}>
-              <Text style={styles.riskPillText}>
-                {scorePct >= 70 ? "Yüksek" : scorePct >= 40 ? "Orta" : "Düşük"}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.resultDesc}>
-            Yüksek skor, analiz edilen görüntüde duman olasılığının arttığını gösterir.
-          </Text>
-        </View>
-      </View>
-    </ScrollView>
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </View>
   );
 }
 
-const YELLOW = "#F4CE14";
+const FeatureCard = ({ icon, title, desc, color }: any) => (
+  <View style={styles.featureCard}>
+    <View style={[styles.iconCircle, { backgroundColor: `${color}20` }]}>
+      <MaterialCommunityIcons name={icon} size={24} color={color} />
+    </View>
+    <View>
+      <Text style={styles.featureTitle}>{title}</Text>
+      <Text style={styles.featureDesc}>{desc}</Text>
+    </View>
+  </View>
+);
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#071a14" },
-  contentContainer: { paddingBottom: 24 },
-
-  // HERO
-  heroWrap: { borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: "hidden" },
-  heroBg: { height: 420, justifyContent: "center", width: '100%' },
-  heroBgImage: { width: '100%', height: '100%' },
-  heroContent: { paddingHorizontal: 20, alignItems: "center" },
-  projectName: { color: "#cfe9d9", fontSize: 18, fontWeight: "800", marginBottom: 6 },
-  heroTitle: {
-    color: "#ffffff",
-    fontSize: 34,
-    fontWeight: "800",
-    textAlign: "center",
-    marginBottom: 12,
+  mainContainer: {
+    flex: 1,
+    backgroundColor: "#0f172a",
   },
-  heroParagraph: {
-    color: "rgba(255,255,255,0.9)",
-    textAlign: "center",
-    lineHeight: 22,
-    fontSize: 14,
-    maxWidth: 760,
-    marginBottom: 18,
+  scrollContent: {
+    paddingBottom: 40,
   },
-  ctaPrimary: {
-    flexDirection: "row",
-    gap: 8,
-    backgroundColor: YELLOW,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 10,
-    alignItems: "center",
+  heroWrapper: {
+    height: 480,
+    width: '100%',
+    position: 'relative',
+    marginBottom: 20,
   },
-  ctaPrimaryText: { color: "#0b2b1a", fontWeight: "800", fontSize: 14 },
-
-  // FLOW
-  flowSection: { marginTop: 16, paddingHorizontal: 12 },
-  flowRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "flex-start",
-    justifyContent: "center",
-    gap: 10,
-    rowGap: 18,
+  heroBackground: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'flex-end',
   },
-  flowStep: { width: 180, paddingHorizontal: 8, alignItems: "center", marginBottom: 6 },
-  flowIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  flowTitle: {
-    color: "#e3f6ec",
-    fontSize: 14,
-    fontWeight: "800",
-    textAlign: "center",
-    marginBottom: 2,
-  },
-  flowDesc: { color: "#9aa1ab", fontSize: 12, textAlign: "center", minHeight: 34 },
-  flowConnector: { width: 28, alignItems: "center", justifyContent: "center", paddingTop: 10 },
-  flowArrow: { color: "#7a8e88", fontWeight: "900", fontSize: 18, lineHeight: 18 },
-
-  // ANALYSIS
-  analysisSection: { backgroundColor: "#0b241a", paddingVertical: 28, paddingHorizontal: 16 },
-  sectionHeadingLight: {
-    color: "#e3f6ec",
-    fontSize: 22,
-    fontWeight: "800",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  sectionSub: {
-    color: "#b6c8c1",
-    textAlign: "center",
-    fontSize: 14,
-    lineHeight: 20,
-    maxWidth: 700,
-    alignSelf: "center",
-    marginBottom: 18,
-  },
-  uploadDrop: {
-    width: "100%",
-    maxWidth: 680,
-    height: 220,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    alignSelf: "center",
-  },
-  uploadPlaceholder: { alignItems: "center", gap: 8 },
-  uploadText: { color: "#d7f5e6", fontWeight: "700" },
-  uploadSub: { color: "#98a8a3", fontSize: 12 },
-  previewImage: { width: "100%", height: "100%", resizeMode: "cover" },
-  coverInput: {
-    position: "absolute",
-    top: 0,
+  heroGradient: {
+    position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
+    height: 200,
+  },
+  heroContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    alignItems: 'flex-start',
+  },
+  badgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: "rgba(34, 197, 94, 0.15)",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(34, 197, 94, 0.3)",
+  },
+  activeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#22c55e",
+    marginRight: 8,
+  },
+  badgeText: {
+    color: "#4ade80",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  heroTitle: {
+    fontSize: 42,
+    fontWeight: "800",
+    color: "#fff",
+    lineHeight: 48,
+    marginBottom: 12,
+  },
+  heroSubtitle: {
+    fontSize: 16,
+    color: "#94a3b8",
+    lineHeight: 24,
+    maxWidth: 600,
+    marginBottom: 24,
+  },
+  heroButtons: {
+    flexDirection: 'row',
+  },
+  btnPrimary: {
+    shadowColor: "#22c55e",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  btnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    gap: 8,
+  },
+  btnText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  sectionContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 32,
+  },
+  sectionHeader: {
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+    marginBottom: 16,
+  },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  featureCard: {
+    width: '48%',
+    backgroundColor: "rgba(30, 41, 59, 0.5)",
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+    gap: 12,
+  },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureTitle: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  featureDesc: {
+    color: "#94a3b8",
+    fontSize: 12,
+  },
+  analysisContainer: {
+    paddingHorizontal: 20,
+  },
+  analysisCard: {
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  cardTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  cardDesc: {
+    color: "#94a3b8",
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  uploadArea: {
+    width: '100%',
+    height: 200,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.15)",
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  placeholderContent: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  uploadTitle: {
+    color: "#e2e8f0",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  uploadSub: {
+    color: "#64748b",
+    fontSize: 12,
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  webInput: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
     opacity: 0,
-    cursor: "pointer",
+    cursor: 'pointer',
   },
-
-  actionRowOnlyMap: { marginTop: 12, alignItems: "center" },
-  btnOutline: {
-    flexDirection: "row",
-    gap: 8,
-    borderWidth: 1,
-    borderColor: "#2a6b4b",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  btnOutlineText: { color: "#cbd5cf", fontWeight: "700" },
-
-  // RESULT CARD
-  resultCard: {
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 14,
+  loadingContainer: {
     padding: 20,
-    marginTop: 20,
-    alignItems: "center",
-    marginHorizontal: 8,
+    alignItems: 'center',
   },
-  resultTitle: { color: "#e3f6ec", fontSize: 18, fontWeight: "800", marginBottom: 12 },
-  chartRow: {
-    width: "100%",
-    maxWidth: 680,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginTop: 6,
+  loadingText: {
+    color: "#94a3b8",
+    fontSize: 14,
   },
-  chartEdge: { color: "#89a39a", fontSize: 12, width: 26, textAlign: "center" },
-  chartTrack: {
-    flex: 1,
-    height: 14,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.08)",
+  resultDashboard: {
+    backgroundColor: "rgba(0,0,0,0.3)",
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    position: "relative",
-    overflow: "hidden",
+    borderColor: "rgba(255,255,255,0.05)",
   },
-  chartFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 999 },
-  tick: {
-    position: "absolute",
-    top: -1,
-    width: 2,
-    height: 16,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    transform: [{ translateX: -1 }],
-  },
-  chartMeta: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "center",
-    gap: 8,
-    marginTop: 10,
-  },
-  scoreValue: { fontSize: 32, fontWeight: "900" },
-  scoreUnit: { fontSize: 14, fontWeight: "600", color: "#9aa1ab" },
-  riskPill: {
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    paddingHorizontal: 8,
+  resultBadge: {
+    alignSelf: 'flex-start',
     paddingVertical: 4,
-    borderRadius: 999,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 12,
   },
-  riskPillText: { color: "#d7f5e6", fontWeight: "800", fontSize: 12 },
-  resultDesc: {
-    color: "#a9bbb5",
-    textAlign: "center",
-    fontSize: 13,
-    lineHeight: 19,
-    maxWidth: 620,
+  resultBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  scoreRow: {
+    marginBottom: 12,
+  },
+  scoreMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: 8,
+  },
+  scoreLabel: {
+    color: "#94a3b8",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  scoreBig: {
+    fontSize: 36,
+    fontWeight: "800",
+    lineHeight: 36,
+  },
+  barContainer: {
+    height: 8,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  disclaimer: {
+    color: "#475569",
+    fontSize: 10,
+    fontStyle: 'italic',
   },
 });
-

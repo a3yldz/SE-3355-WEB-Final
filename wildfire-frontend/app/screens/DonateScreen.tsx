@@ -1,4 +1,3 @@
-// app/screens/BirlikteYeserScreen.tsx (ported)
 import React, { useEffect, useRef } from "react";
 import {
   View,
@@ -15,40 +14,36 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
-/** Yerel, sade palet (tema bağımsız) */
 const c = {
   bg: "#ffffff",
   panel: "#f9fafb",
   border: "rgba(0,0,0,0.08)",
-  text: "#0f172a",     // slate-900
-  muted: "#6b7280",    // slate-500
-  accent: "#16a34a",   // green-600
+  text: "#0f172a",
+  muted: "#6b7280",
+  accent: "#16a34a",
   accentBg: "#e8f5ee",
   warn: "#F4CE14",
 };
 
 export default function DonateScreen() {
-  // (Mock) metrikler
   const monthPoolTL = 1860;
   const goalTL = 3000;
   const treesPlanted = 210;
   const animalsHelped = 37;
   const progress = Math.max(0, Math.min(1, monthPoolTL / goalTL));
 
-  // Aksiyonlar (şimdilik stub)
   const onUploadPress = () =>
-    Alert.alert("İhbar Et", "Konum + fotoğraf yükleme akışını bağlayın.");
+    Alert.alert("Report Incident", "Connect location + photo upload flow.");
   const donatePoints = () =>
-    Alert.alert("Puanımı Bağışla", "100 puan = 10₺ havuza çevrilir (örnek).");
+    Alert.alert("Donate My Points", "100 points = ₺10 converted to pool (example).");
   const plantOneTree = async () => {
     try {
       await Linking.openURL("https://example.org/bir-fidan");
-    } catch {}
+    } catch { }
   };
 
-  // 🌱 Basit “fidan büyüme” animasyonu (dosyasız)
   const scale = useRef(new Animated.Value(0.92)).current;
-  const sway = useRef(new Animated.Value(0)).current; // -1..1
+  const sway = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.loop(
       Animated.parallel([
@@ -69,20 +64,17 @@ export default function DonateScreen() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 120 /* FAB boşluğu */ }}
+        contentContainerStyle={{ paddingBottom: 120 }}
       >
-        {/* HERO */}
         <View style={s.heroCard}>
-          {/* üstte ince yeşil şerit */}
           <View style={s.heroTopStripe} />
-          <Text style={s.kicker}>Birlikte Yeşer</Text>
-          <Text style={s.heroTitle}>İhbar et, doğrula; puanın fidana dönüşsün</Text>
+          <Text style={s.kicker}>Grow Together</Text>
+          <Text style={s.heroTitle}>Report, verify; let your points become saplings</Text>
           <Text style={s.heroSub}>
-            Topluluk gücüyle yangınları en erken anda yakalıyoruz. Puanlar ay sonunda
-            fidan dikimi ve yaralı hayvanların tedavisine eşit pay edilir.
+            With community power, we catch fires at the earliest moment. Points are equally
+            distributed between sapling planting and injured animal treatment at month end.
           </Text>
 
-          {/* 🌱 animasyon */}
           <Animated.View
             style={[
               s.plantBubble,
@@ -92,34 +84,31 @@ export default function DonateScreen() {
             <MaterialIcons name="park" size={56} color={c.accent} />
           </Animated.View>
 
-          {/* hedef/ilerleme çubuğu */}
           <View style={{ width: "100%", marginTop: 10 }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <Text style={s.heroMeta}>Hedef: {goalTL.toLocaleString("tr-TR")}₺</Text>
+              <Text style={s.heroMeta}>Goal: {goalTL.toLocaleString("en-US")}₺</Text>
               <Text style={s.heroMeta}>{Math.round(progress * 100)}%</Text>
             </View>
             <View style={s.progressTrack}>
               <View style={[s.progressBar, { width: `${progress * 100}%` }]} />
             </View>
             <Text style={[s.heroMeta, { marginTop: 6 }]}>
-              Toplanan: <Text style={{ fontWeight: "900", color: c.text }}>{monthPoolTL}₺</Text>
+              Collected: <Text style={{ fontWeight: "900", color: c.text }}>{monthPoolTL}₺</Text>
             </Text>
           </View>
 
-          {/* CTA'lar */}
           <View style={s.ctaRow}>
             <TouchableOpacity style={s.ctaPrimary} onPress={donatePoints}>
               <MaterialIcons name="favorite" size={18} color="#0b2b1a" />
-              <Text style={s.ctaPrimaryText}>Puanımı Bağışla</Text>
+              <Text style={s.ctaPrimaryText}>Donate My Points</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.ctaGhost} onPress={plantOneTree}>
               <MaterialIcons name="park" size={18} color={c.text} />
-              <Text style={s.ctaGhostText}>Bir Fidan Dik</Text>
+              <Text style={s.ctaGhostText}>Plant a Tree</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* İlham banner (uzak görsel; istersen kendi dosyanla değiştir) */}
         <View style={{ marginHorizontal: 12, marginTop: 10 }}>
           <View style={s.bannerCard}>
             <ImageBackground
@@ -129,51 +118,46 @@ export default function DonateScreen() {
             />
             <View style={s.bannerOverlay} />
             <View style={s.bannerContent}>
-              <Text style={s.bannerKicker}>Toplulukla Güçlü</Text>
-              <Text style={s.bannerTitle}>Fidanlarımızı ekiyor, umutlarımızı çoğaltıyoruz</Text>
+              <Text style={s.bannerKicker}>Strong with Community</Text>
+              <Text style={s.bannerTitle}>Planting our saplings, multiplying our hopes</Text>
               <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
                 <TouchableOpacity style={s.ctaPrimary} onPress={donatePoints}>
                   <MaterialIcons name="favorite" size={18} color="#0b2b1a" />
-                  <Text style={s.ctaPrimaryText}>Puanımı Bağışla</Text>
+                  <Text style={s.ctaPrimaryText}>Donate My Points</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Sayaçlar */}
         <View style={s.metricsRow}>
-          <Metric label="Bu Ay Bağış" value={`${monthPoolTL}₺`} trend="+240₺" />
-          <Metric label="Dikilen Fidan" value={`${treesPlanted}`} trend="+12" />
-          <Metric label="Tedavi (Hayvan)" value={`${animalsHelped}`} trend="+3" />
+          <Metric label="This Month Donation" value={`${monthPoolTL}₺`} trend="+240₺" />
+          <Metric label="Trees Planted" value={`${treesPlanted}`} trend="+12" />
+          <Metric label="Animals Treated" value={`${animalsHelped}`} trend="+3" />
         </View>
 
-        {/* 3 Adım */}
-        <Panel title="3 Adımda Katkı">
+        <Panel title="3 Steps to Contribute">
           <View style={s.stepsRow}>
-            <Step icon="photo-camera" title="İhbar Et" desc="Konum + fotoğraf ekle" onPress={onUploadPress} />
-            <Step icon="thumb-up" title="Doğrula" desc="Topluluk ihbarlarını onayla" />
-            <Step icon="volunteer-activism" title="Puanı Fidan Yap" desc="100 puan ≈ 10₺ etki" onPress={donatePoints} />
+            <Step icon="photo-camera" title="Report" desc="Add location + photo" onPress={onUploadPress} />
+            <Step icon="thumb-up" title="Verify" desc="Confirm community reports" />
+            <Step icon="volunteer-activism" title="Points to Trees" desc="100 points ≈ ₺10 impact" onPress={donatePoints} />
           </View>
         </Panel>
 
-        {/* Şeffaflık Sözümüz */}
-        <Panel title="Şeffaflık Sözümüz">
-          <Bullet>100 puan = <Text style={s.bold}>10₺</Text> havuza çevrilir.</Bullet>
-          <Bullet>Havuzun <Text style={s.bold}>%50’si fidan</Text>, <Text style={s.bold}>%50’si hayvan tedavisine</Text> ayrılır.</Bullet>
-          <Bullet>Aylık rapor ve sayaçlar herkesle paylaşılır.</Bullet>
+        <Panel title="Our Transparency Promise">
+          <Bullet>100 points = <Text style={s.bold}>₺10</Text> converted to pool.</Bullet>
+          <Bullet><Text style={s.bold}>50% of pool to saplings</Text>, <Text style={s.bold}>50% to animal treatment</Text>.</Bullet>
+          <Bullet>Monthly reports and counters shared with everyone.</Bullet>
         </Panel>
 
-        {/* SSS */}
-        <Panel title="Sık Sorulanlar">
-          <QA q="Puanları nasıl kazanırım?" a="İhbar +10, doğrulama +2. Günlük sınırlar uygulanır." />
-          <QA q="Bağışa dönüştürme ne zaman olur?" a="İstediğin an puanı dönüştürürsün; ay sonunda rapora girer." />
-          <QA q="Anonim kalabilir miyim?" a="Evet. Liderlikte ismin yerine anonim gösterebiliriz." />
-          <QA q="Yanlış ihbar cezası var mı?" a="Kötü niyetli tekrarlar puan kazanmaz, sistem tarafından filtrelenir." />
+        <Panel title="FAQ">
+          <QA q="How do I earn points?" a="Report +10, verification +2. Daily limits apply." />
+          <QA q="When is the donation conversion?" a="Convert points anytime; entered in month-end report." />
+          <QA q="Can I stay anonymous?" a="Yes. We can show anonymous instead of your name on leaderboard." />
+          <QA q="Is there a penalty for false reports?" a="Malicious repeats don't earn points, filtered by system." />
         </Panel>
       </ScrollView>
 
-      {/* FAB'ler (mobil aksiyon kısayolları) */}
       <View pointerEvents="box-none" style={s.fabsWrap}>
         <TouchableOpacity style={[s.fab, { backgroundColor: c.accent }]} onPress={onUploadPress}>
           <MaterialIcons name="photo-camera" size={22} color="#fff" />
@@ -185,8 +169,6 @@ export default function DonateScreen() {
     </View>
   );
 }
-
-/* -------------------- küçük bileşenler -------------------- */
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -252,8 +234,6 @@ function QA({ q, a }: { q: string; a: string }) {
     </View>
   );
 }
-
-/* -------------------- stiller -------------------- */
 
 const cardShadow = Platform.select({
   ios: {
@@ -428,6 +408,3 @@ const s = StyleSheet.create({
     ...cardShadow,
   },
 });
-
-
-

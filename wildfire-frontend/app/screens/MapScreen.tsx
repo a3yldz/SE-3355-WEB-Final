@@ -1,22 +1,22 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, Platform } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Platform, Dimensions } from "react-native";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import MapUniversal from "../components/MapUniversal/MapUniversal";
 import { useUIStore } from "../store/useUIStore";
 import RiskLegend from "../components/overlays/RiskLegend";
 import { colorForRisk } from "../utils/colors";
-import { useRiskNowcastsByPolygon, Area } from "../hooks/useRiskNowcast"; 
-import { BASE_URL } from "../utils/config"; // Sadece hata ayıklama metni için import ediyoruz
-
-
+import { useRiskNowcastsByPolygon, Area } from "../hooks/useRiskNowcast";
+import { BASE_URL } from "../utils/config";
 
 const AREAS: Area[] = [
-  { id: "ist", name: "İstanbul", bbox: { minLon: 28.0, minLat: 40.7, maxLon: 29.8, maxLat: 41.6 } },
-  { id: "izmir", name: "İzmir", bbox: { minLon: 26.0, minLat: 38.1, maxLon: 27.5, maxLat: 39.4 } },
+  { id: "ist", name: "Istanbul", bbox: { minLon: 28.0, minLat: 40.7, maxLon: 29.8, maxLat: 41.6 } },
+  { id: "izmir", name: "Izmir", bbox: { minLon: 26.0, minLat: 38.1, maxLon: 27.5, maxLat: 39.4 } },
   { id: "ankara", name: "Ankara", bbox: { minLon: 32.3, minLat: 39.6, maxLon: 33.1, maxLat: 40.1 } },
 ];
+
 const degToCompass = (deg?: number) => {
   if (deg == null || isNaN(deg)) return "-";
-  const dirs = ["K", "KD", "D", "GD", "G", "GB", "B", "KB"];
+  const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
   const i = Math.round(deg / 45) % 8;
   return `${dirs[i]}, ${Math.round(deg)}°`;
 };
@@ -35,14 +35,12 @@ export default function MapScreen() {
         const cityNames = AREAS.map(a => a.name);
         const polygons = turkeyProvinces.features.filter((f: any) => cityNames.includes(f.properties.name));
         setCityPolygons(polygons);
-        console.log("✅ Şehir poligonları başarıyla yüklendi.");
-      } catch (error) { console.error("❌ Şehir poligonları yüklenirken hata:", error); }
+      } catch (error) { console.error("Error loading city polygons:", error); }
     };
     loadCityPolygons();
   }, []);
 
   const { data: riskData, isLoading: anyLoading, isError: anyError } = useRiskNowcastsByPolygon(cityPolygons, hourOffset);
-
 
   const paintedRisk = useMemo(() => {
     if (!riskData || !layerRiskVisible) return undefined;
@@ -54,8 +52,6 @@ export default function MapScreen() {
       })),
     };
   }, [riskData, layerRiskVisible, riskOpacity]);
-
-
 
   const stats = useMemo(() => {
     const feats = (paintedRisk?.features ?? []) as any[];
@@ -83,157 +79,299 @@ export default function MapScreen() {
     setMarkers((prev) => [...prev, { id, coord: lngLat }]);
   };
 
+  const DetailRow = ({ icon, label, value, color = "#fff" }: any) => (
+    <View style={styles.detailRow}>
+      <Ionicons name={icon} size={16} color={color} style={{ marginRight: 6 }} />
+      <Text style={styles.detailLabel}>{label}:</Text>
+      <Text style={[styles.detailValue, { color }]}>{value}</Text>
+    </View>
+  );
+
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.container}>
       <MapUniversal
-        initialCenter={[32.0, 39.5]} initialZoom={5.5} riskGeoJSON={paintedRisk}
-        riskOpacity={riskOpacity} markers={markers} onMapClick={handleMapClick}
+        initialCenter={[32.0, 39.5]}
+        initialZoom={5.5}
+        riskGeoJSON={paintedRisk}
+        riskOpacity={riskOpacity}
+        markers={markers}
+        onMapClick={handleMapClick}
         onRiskCellPress={(p: any) => setCell(p)}
       />
 
-      {/* <<<<<<<<<<<<<<<< SAAT KAYDIRMA BUTONLARI BURAYA GERİ EKLENDİ >>>>>>>>>>>>>>>>> */}
-{/* Top Bar */}
-      <View style={{ position: "absolute", top: 12, left: 12, right: 12, gap: 8 }}>
-        <View style={{ backgroundColor: "rgba(0,0,0,0.6)", borderRadius: 12, padding: 10 }}>
-          <Text style={{ color: "#fff", fontWeight: "700" }}>
-            AOI'ler: {AREAS.map(a => a.name).join(" • ")}
-          </Text>
-          <Text style={{ color: "#ddd", marginTop: 2 }}>Saat kaydır: şu an + {hourOffset}h</Text>
-          <Text style={{ color: "#9ae6b4", fontSize: 10, marginTop: 2 }}>
-            💡 Saat barı ile gelecekteki yangın riskini tahmin edin
-          </Text>
-          <View style={{ flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+      <View style={styles.topContainer}>
+        <View style={styles.glassPanel}>
+          <View style={styles.headerRow}>
+            <MaterialCommunityIcons name="map-marker-radius" size={20} color="#4ade80" />
+            <Text style={styles.headerTitle}>Active AOIs: {AREAS.map(a => a.name).join(", ")}</Text>
+          </View>
+
+          <Text style={styles.subText}>Prediction Time: <Text style={{ fontWeight: '700', color: '#fff' }}>Now +{hourOffset}h</Text></Text>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.timeScroll}>
             {[0, 1, 3, 6, 12, 24].map((h) => (
               <TouchableOpacity
                 key={h}
                 onPress={() => setHourOffset(h)}
-                style={{
-                  backgroundColor: hourOffset === h ? "#22c55e" : "#333",
-                  paddingVertical: 6,
-                  paddingHorizontal: 10,
-                  borderRadius: 8,
-                  marginBottom: 6,
-                }}
+                style={[styles.timeChip, hourOffset === h && styles.timeChipActive]}
               >
-                <Text style={{ color: "#fff" }}>+{h}h</Text>
+                <Text style={[styles.timeText, hourOffset === h && styles.timeTextActive]}>+{h}h</Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
         </View>
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <TouchableOpacity
-            onPress={toggleRisk}
-            style={{ backgroundColor: "#111", paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }}
-          >
-            <Text style={{ color: "#fff" }}>{layerRiskVisible ? "Risk Katmanını Gizle" : "Risk Katmanını Göster"}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-      {/* <<<<<<<<<<<<<<<< EKLEME BİTTİ >>>>>>>>>>>>>>>>> */}
 
-      {/* Legend */}
+        <TouchableOpacity onPress={toggleRisk} style={styles.fabButton}>
+          <Ionicons name={layerRiskVisible ? "eye" : "eye-off"} size={22} color="#fff" />
+          <Text style={styles.fabText}>{layerRiskVisible ? "Risk Layer On" : "Layer Hidden"}</Text>
+        </TouchableOpacity>
+      </View>
+
       {layerRiskVisible && (
-        <View style={{ position: "absolute", bottom: 16, left: 12 }}>
+        <View style={styles.legendContainer}>
           <RiskLegend />
         </View>
       )}
 
-    {/* ======================= ÇÖZÜM BURADA BAŞLIYOR ======================= */}
-    {/*
-      Sağ alttaki TÜM elemanlar için TEK BİR kapsayıcı oluşturuyoruz.
-      - position: 'absolute' ile sağ alta sabitliyoruz.
-      - alignItems: 'flex-end' ile içindeki kartları sağa yaslıyoruz.
-      - gap: 8 ile kartlar arasında 8 piksellik dikey boşluk bırakıyoruz.
-    */}
-    <View style={{ position: 'absolute', bottom: 16, right: 12, alignItems: 'flex-end', gap: 8 }}>
-      
-      {/* Backend Durum Kartı */}
-      {(anyLoading || anyError) && (
-        <View style={{ backgroundColor: "rgba(0,0,0,0.7)", padding: 10, borderRadius: 10, maxWidth: 280 }}>
-          <Text style={{ color: "#fff", fontWeight: "700" }}>
-            {anyLoading ? "🔄 Risk katmanları yükleniyor..." : "❌ Backend'e bağlanılamadı."}
-          </Text>
-        </View>
-      )}
+      <View style={styles.bottomRightContainer}>
 
-      {/* Hücre Detay Kartı (Sadece 'cell' verisi varsa gösterilir) */}
-      {cell && (
-        // BU VIEW'DEN "position: absolute" KALDIRILDI. Pozisyonunu artık üstteki kapsayıcı belirliyor.
-        <View style={{ backgroundColor: "rgba(20,20,20,0.9)", padding: 16, borderRadius: 12, width: 350, gap: 8 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>🔥 Hücre Detayları</Text>
-            <TouchableOpacity onPress={() => setCell(null)} style={{ backgroundColor: "#444", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-              <Text style={{ color: "#fff", fontSize: 14 }}>✕</Text>
-            </TouchableOpacity>
+        {(anyLoading || anyError) && (
+          <View style={[styles.statusBadge, { backgroundColor: anyError ? "#ef4444" : "#f59e0b" }]}>
+            <Text style={styles.statusText}>
+              {anyLoading ? "🔄 Updating..." : "❌ Connection Lost"}
+            </Text>
           </View>
+        )}
 
-          {/* Konum Bilgisi */}
-          <View style={{ backgroundColor: "#333", padding: 8, borderRadius: 8 }}>
-            <Text style={{ color: "#4ade80", fontWeight: "600", fontSize: 12, marginBottom: 4 }}>📍 Konum</Text>
-            <Text style={{ color: "#fff" }}>Koordinat: {Number(cell.coord?.[0] || 0).toFixed(4)}, {Number(cell.coord?.[1] || 0).toFixed(4)}</Text>
-            <Text style={{ color: "#fff" }}>Bölge: {cell.aoiName ?? "Bilinmeyen"}</Text>
-          </View>
+        {cell && (
+          <View style={styles.detailCard}>
+            <View style={styles.cardHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialCommunityIcons name="fire-alert" size={20} color="#f59e0b" />
+                <Text style={styles.cardTitle}>Cell Analysis</Text>
+              </View>
+              <TouchableOpacity onPress={() => setCell(null)} style={styles.closeBtn}>
+                <Ionicons name="close" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
 
-          {/* Yangın Riski Bilgisi */}
-          <View style={{ backgroundColor: "#333", padding: 8, borderRadius: 8 }}>
-            <Text style={{ color: "#f59e0b", fontWeight: "600", fontSize: 12, marginBottom: 4 }}>⚠️ Yangın Riski</Text>
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
-              <Text style={{ color: "#fff" }}>Risk Seviyesi: </Text>
-              <Text style={{ color: Number(cell.risk) > 0.7 ? "#ef4444" : Number(cell.risk) > 0.4 ? "#f59e0b" : "#22c55e", fontWeight: "700" }}>
-                {(Number(cell.risk) * 100).toFixed(1)}%
+            <View style={styles.riskIndicator}>
+              <Text style={styles.riskLabel}>FIRE RISK PROBABILITY</Text>
+              <Text style={[styles.riskValue, { color: Number(cell.risk) > 0.7 ? "#ef4444" : Number(cell.risk) > 0.4 ? "#f59e0b" : "#22c55e" }]}>
+                %{(Number(cell.risk) * 100).toFixed(1)}
               </Text>
             </View>
-            <Text style={{ color: "#fff" }}>Yakıt Nemi: {(Number(cell.fuel_moisture) * 100).toFixed(0)}%</Text>
-            <Text style={{ color: "#fff" }}>Bitki Örtüsü: {cell.vegetation || "bilinmiyor"}</Text>
-          </View>
 
-          {/* Hava Durumu Bilgisi */}
-          <View style={{ backgroundColor: "#333", padding: 8, borderRadius: 8 }}>
-            <Text style={{ color: "#3b82f6", fontWeight: "600", fontSize: 12, marginBottom: 4 }}>🌤️ Hava Durumu</Text>
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <View>
-                <Text style={{ color: "#fff" }}>🌡️ Sıcaklık: {Number(cell.temp).toFixed(1)}°C</Text>
-                <Text style={{ color: "#fff" }}>💧 Nem: {Number(cell.rh).toFixed(0)}%</Text>
+            <View style={styles.divider} />
+
+            <View style={styles.gridContainer}>
+              <View style={styles.gridItem}>
+                <DetailRow icon="thermometer" label="Temp" value={`${Number(cell.temp).toFixed(1)}°C`} color="#93c5fd" />
+                <DetailRow icon="water" label="Hum" value={`${Number(cell.rh).toFixed(0)}%`} color="#93c5fd" />
               </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ color: "#fff" }}>💨 Rüzgar: {Number(cell.wind).toFixed(1)} m/s</Text>
-                <Text style={{ color: "#fff" }}>🧭 Yön: {degToCompass(cell.wind_dir)}</Text>
+              <View style={styles.gridItem}>
+                <DetailRow icon="speedometer" label="Wind" value={`${Number(cell.wind).toFixed(1)} m/s`} color="#a78bfa" />
+                <DetailRow icon="compass" label="Dir" value={degToCompass(cell.wind_dir)} color="#a78bfa" />
               </View>
             </View>
-          </View>
-          
-          {/* Çevresel Faktörler */}
-          <View style={{ backgroundColor: "#333", padding: 8, borderRadius: 8 }}>
-              <Text style={{ color: "#a78bfa", fontWeight: "600", fontSize: 12, marginBottom: 4 }}>🌍 Çevresel Faktörler</Text>
-              <Text style={{ color: "#fff" }}>
-                  Kuraklık Durumu: {cell.dry_days > 2 ? `${cell.dry_days} gündür yağış yok` : "Nemli"}
-              </Text>
-              <Text style={{ color: "#fff" }}>
-                  Arazi Eğimi Etkisi: {cell.slope_factor > 1.05 ? "Yüksek" : "Düşük"}
-              </Text>
-          </View>
 
-          {/* Bölge Ortalaması (Sadece 'stats' verisi varsa gösterilir) */}
-          {stats && (
-            <View style={{ marginTop: 4, backgroundColor: "#1a4d3a", padding: 8, borderRadius: 8 }}>
-              <Text style={{ color: "#22c55e", fontWeight: "700", marginBottom: 4, fontSize: 12 }}>📈 Tüm Bölge Ortalaması</Text>
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: "#9ae6b4" }}>🌡️ Ort. Sıcaklık: {stats.tAvg.toFixed(1)}°C</Text>
-                  <Text style={{ color: "#9ae6b4" }}>💧 Ort. Nem: {stats.rhAvg.toFixed(0)}%</Text>
-                </View>
-                <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <Text style={{ color: "#9ae6b4" }}>💨 Ort. Rüzgar: {stats.wsAvg.toFixed(1)} m/s</Text>
-                  <Text style={{ color: "#9ae6b4" }}>🧭 Ort. Yön: {degToCompass(stats.dirAvg)}</Text>
-                </View>
-              </View>
+            <View style={styles.divider} />
+
+            <View style={styles.environmentalRow}>
+              <Text style={styles.envText}>🌱 Vegetation: <Text style={{ color: '#fff' }}>{cell.vegetation || "N/A"}</Text></Text>
+              <Text style={styles.envText}>⛰️ Slope: <Text style={{ color: '#fff' }}>{cell.slope_factor > 1.05 ? "Steep" : "Flat"}</Text></Text>
             </View>
-          )}
-        </View>
-      )}
+          </View>
+        )}
+      </View>
     </View>
-    {/* ======================== ÇÖZÜMÜN SONU ======================== */}
-  </View>
-);
-
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#1e1e1e",
+  },
+  topContainer: {
+    position: "absolute",
+    top: 50,
+    left: 16,
+    right: 16,
+  },
+  glassPanel: {
+    backgroundColor: "rgba(20, 20, 30, 0.85)",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  headerTitle: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+    marginLeft: 6,
+  },
+  subText: {
+    color: "#94a3b8",
+    fontSize: 12,
+    marginBottom: 12,
+  },
+  timeScroll: {
+    flexGrow: 0,
+  },
+  timeChip: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  timeChipActive: {
+    backgroundColor: "rgba(34, 197, 94, 0.2)",
+    borderColor: "#22c55e",
+  },
+  timeText: {
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  timeTextActive: {
+    color: "#22c55e",
+  },
+  fabButton: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: "#111",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  fabText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  legendContainer: {
+    position: "absolute",
+    bottom: 30,
+    left: 16,
+  },
+  bottomRightContainer: {
+    position: 'absolute',
+    bottom: 30,
+    right: 16,
+    alignItems: 'flex-end',
+    gap: 12,
+  },
+  statusBadge: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  statusText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  detailCard: {
+    width: 280,
+    backgroundColor: "rgba(15, 23, 42, 0.95)",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cardTitle: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+    marginLeft: 6,
+    letterSpacing: 0.5,
+  },
+  closeBtn: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+    padding: 4,
+    borderRadius: 12,
+  },
+  riskIndicator: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  riskLabel: {
+    color: "#64748b",
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  riskValue: {
+    fontSize: 32,
+    fontWeight: "800",
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    marginVertical: 8,
+  },
+  gridContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  gridItem: {
+    flex: 1,
+    gap: 6,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailLabel: {
+    color: "#64748b",
+    fontSize: 12,
+    marginRight: 4,
+  },
+  detailValue: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  environmentalRow: {
+    marginTop: 4,
+    gap: 2,
+  },
+  envText: {
+    color: "#94a3b8",
+    fontSize: 11,
+  },
+});

@@ -1,4 +1,5 @@
-# main.py
+from dotenv import load_dotenv
+load_dotenv()
 
 import numpy as np
 from fastapi import FastAPI
@@ -11,13 +12,18 @@ import asyncio
 import os
 import math
 from datetime import datetime, timedelta
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File
+from contextlib import asynccontextmanager
+import time
 
-# API Anahtarları ve URL'ler
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "e7e87950d4cbef19404e95fbad64d7d3")
 OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5"
 ELEVATION_API_URL = "https://api.open-elevation.com/api/v1/lookup"
 
-# --- Yardımcı Fonksiyon ve Servis Sınıfları (Burada değişiklik yok) ---
+ROBOFLOW_API_URL = "https://detect.roboflow.com"
+ROBOFLOW_API_KEY = "XoNbKefV5xjEal7LJ744"
+ROBOFLOW_MODEL_ID = "smoke-detection-5tkur/3"
+
 def inverse_distance_weighting(target_point: tuple, data_points: list, power=2) -> float:
     numerator, denominator = 0, 0
     for lon, lat, value in data_points:
@@ -40,7 +46,7 @@ class TopographyService:
                     self.elevation_cache[cache_key] = elevation
                     return elevation
                 except Exception as e:
-                    print(f"Rakım API Hatası ({lat},{lon}): {e}"); self.elevation_cache[cache_key] = None; return None
+                    print(f"Elevation API Error ({lat},{lon}): {e}"); self.elevation_cache[cache_key] = None; return None
     async def get_slope_factor(self, polygon_bounds) -> float:
         min_lon, min_lat, max_lon, max_lat = polygon_bounds
         points = [(min_lat, min_lon), (max_lat, min_lon), (min_lat, max_lon), (max_lat, max_lon)]
@@ -95,21 +101,14 @@ class OpenWeatherService:
         return "low"
 
 
-# ==============================================================================
-# 2. AdvancedFireRiskCalculator SINIFINDA DEĞİŞİKLİK
-# ==============================================================================
-
 class AdvancedFireRiskCalculator:
     def __init__(self):
         self.vegetation_risk_factors = {"pine_forest": 0.9, "mediterranean_forest": 0.8, "mixed_forest": 0.7}
         self.human_activity_factors = {"high": 0.3, "medium": 0.2, "low": 0.1}
 
     def _calculate_vpd(self, temp_c: float, rh_percent: float) -> float:
-        """Sıcaklık ve nemden Buhar Basıncı Açığı'nı (VPD) hPa cinsinden hesaplar."""
         if temp_c is None or rh_percent is None: return 0.0
-        # Doymuş Buhar Basıncı (SVP) - Magnus formülü
         svp = 6.112 * math.exp((17.67 * temp_c) / (temp_c + 243.5))
-        # Gerçek Buhar Basıncı (AVP)
         avp = svp * (rh_percent / 100.0)
         return svp - avp
 
@@ -118,35 +117,85 @@ class AdvancedFireRiskCalculator:
         wind_speed = features.get("wind_speed_ms", 0.0); fuel_moisture = features.get("fuel_moisture", 0.5)
         vegetation = features.get("vegetation_type", "mixed_forest"); human_activity = features.get("human_activity", "low")
 
-        # 1. YENİLİK: VPD (Buhar Basıncı Açığı) riskini hesapla
         vpd = self._calculate_vpd(temp, rh)
-        # VPD 15 hPa (1.5 kPa) üzerine çıktığında risk artar, 40 hPa'da maksimum olur
         vpd_risk = min(1.0, max(0.0, (vpd - 15) / 25))
         
-        # Diğer faktörler aynı kalıyor
         wind_risk = min(1, wind_speed / 15)
         fuel_risk = 1 - fuel_moisture
         vegetation_risk = self.vegetation_risk_factors.get(vegetation, 0.5)
         human_risk = self.human_activity_factors.get(human_activity, 0.1)
 
-        # 2. YENİLİK: Risk ağırlıklandırmasını VPD odaklı olarak güncelle
         base_risk = (
-            vpd_risk * 0.50 +           # Sıcaklık ve nemin birleşik, güçlü etkisi
-            fuel_risk * 0.25 +          # Yakıtın kendi durumu
-            wind_risk * 0.15 +          # Yayılma hızı
+            vpd_risk * 0.50 +
+            fuel_risk * 0.25 +
+            wind_risk * 0.15 +
             vegetation_risk * 0.05 +
             human_risk * 0.05
         )
         
-        # Dış çarpanlar (kuraklık ve eğim) aynı
         total_risk = base_risk * slope_factor * drought_factor
         return min(1.0, max(0.0, total_risk))
 
-# ==============================================================================
-# 3. FASTAPI UYGULAMASI VE ENDPOINT
-# ==============================================================================
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.http = httpx.AsyncClient(timeout=10)
+    yield
+    await app.state.http.aclose()
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+@app.get("/health")
+async def health():
+    return {"ok": True, "ts": time.time()}
+
+@app.post("/smoke/detect")
+async def detect_smoke(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        
+        detect_url = f"{ROBOFLOW_API_URL}/{ROBOFLOW_MODEL_ID}"
+        params = {"api_key": ROBOFLOW_API_KEY}
+        files = {"file": (file.filename or "upload.jpg", contents, file.content_type or "application/octet-stream")}
+        
+        client = getattr(app.state, 'http', None)
+        if client:
+            response = await client.post(detect_url, params=params, files=files)
+        else:
+            async with httpx.AsyncClient(timeout=30) as new_client:
+                response = await new_client.post(detect_url, params=params, files=files)
+
+        response.raise_for_status()
+        result = response.json()
+        
+        max_confidence = 0.0
+        detections = []
+        
+        if result and "predictions" in result:
+            for prediction in result["predictions"]:
+                if "confidence" in prediction:
+                    confidence = prediction["confidence"]
+                    max_confidence = max(max_confidence, confidence)
+                    detections.append({
+                        "confidence": confidence,
+                        "class": prediction.get("class", "smoke"),
+                        "bbox": prediction.get("bbox", {})
+                    })
+        
+        risk_score = max_confidence * 100
+        
+        return {
+            "success": True,
+            "risk_score": risk_score,
+            "confidence": max_confidence,
+            "detections": detections,
+            "detection_count": len(detections),
+            "raw_result": result
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Smoke detection failed: {str(e)}")
 
 weather_service = OpenWeatherService(api_key=OPENWEATHER_API_KEY)
 risk_calculator = AdvancedFireRiskCalculator()
@@ -160,11 +209,10 @@ class RiskResponse(BaseModel): type: str = "FeatureCollection"; features: List[R
 @app.post("/risk/nowcast_by_polygon", response_model=RiskResponse)
 async def get_risk_nowcast_for_polygon(
     polygon_request: PolygonRequest, hourOffset: int = 0,
-    provider: str = "hyper_model_vpd", version: int = 7 # Provider adını güncelledik
+    provider: str = "hyper_model_vpd", version: int = 7
 ):
     polygon = shape(polygon_request.geometry); min_lon, min_lat, max_lon, max_lat = polygon.bounds
 
-    # Dış faktörleri hesaplama (aynı)
     slope_factor_task = topography_service.get_slope_factor((min_lon, min_lat, max_lon, max_lat))
     center_lon, center_lat = polygon.centroid.x, polygon.centroid.y
     main_forecast_task = weather_service.get_forecast(center_lat, center_lon)
@@ -172,7 +220,6 @@ async def get_risk_nowcast_for_polygon(
     dry_days = drought_service.calculate_consecutive_dry_days(main_forecast['list']) if main_forecast and 'list' in main_forecast else 0
     drought_factor = drought_service.get_drought_factor(dry_days)
 
-    # İnterpolasyon için veri çekme (aynı)
     strategic_points = [(min_lon, min_lat), (max_lon, min_lat), (min_lon, max_lat), (max_lon, max_lat), (center_lon, center_lat)]
     forecast_results = await asyncio.gather(*[weather_service.get_forecast(lat, lon) for lon, lat in strategic_points])
     processed_points = []
@@ -187,7 +234,6 @@ async def get_risk_nowcast_for_polygon(
     data_sets = {key: [(p['lon'], p['lat'], p['features'][key]) for p in processed_points]
                  for key in ["temperature_c", "relative_humidity", "wind_speed_ms", "wind_direction"]}
 
-    # Yanıt oluşturma (aynı)
     nx, ny = 20, 20
     lon_points = np.linspace(min_lon, max_lon, nx); lat_points = np.linspace(min_lat, max_lat, ny)
     risk_features_to_add = []
@@ -199,7 +245,6 @@ async def get_risk_nowcast_for_polygon(
                 for key, data in data_sets.items():
                     point_features[key] = inverse_distance_weighting((p_lon, p_lat), data)
                 
-                # Risk hesaplaması artık yeni faktörleri kullanıyor
                 risk_value = risk_calculator.calculate_risk(point_features, slope_factor, drought_factor)
                 
                 risk_features_to_add.append(RiskPoint(
@@ -209,11 +254,11 @@ async def get_risk_nowcast_for_polygon(
                         "rh": int(point_features['relative_humidity']), "wind": round(point_features['wind_speed_ms'], 1),
                         "wind_dir": int(point_features.get('wind_direction', 0)),
                         "fuel_moisture": round(point_features.get('fuel_moisture', 0.5), 2),
-                        "vegetation": point_features.get('vegetation_type', 'bilinmiyor'),
+                        "vegetation": point_features.get('vegetation_type', 'unknown'),
                         "slope_factor": round(slope_factor, 2), "drought_factor": round(drought_factor, 2),
                         "dry_days": dry_days, "provider": f"{provider}:v{version}"
                     }
                 ))
 
-    print(f"'{polygon_request.properties.get('name')}' için (VPD Model) risk hesaplandı. Kuraklık Faktörü: {drought_factor:.2f}, Eğim Faktörü: {slope_factor:.2f}")
+    print(f"Risk calculated for '{polygon_request.properties.get('name')}' (VPD Model). Drought Factor: {drought_factor:.2f}, Slope Factor: {slope_factor:.2f}")
     return RiskResponse(features=risk_features_to_add)

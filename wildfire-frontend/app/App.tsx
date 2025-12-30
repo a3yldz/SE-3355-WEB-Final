@@ -1,4 +1,3 @@
-// app/App.tsx
 import React from "react";
 import { SafeAreaView, View } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

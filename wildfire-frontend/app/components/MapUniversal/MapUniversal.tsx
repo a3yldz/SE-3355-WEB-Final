@@ -1,5 +1,3 @@
-// app/components/MapUniversal/MapUniversal.tsx
-
 import React from "react";
 import { Platform, View, Text } from "react-native";
 import WebMap from "./WebMap";
@@ -11,7 +9,7 @@ export type MapUniversalProps = {
   initialZoom?: number;
   riskGeoJSON?: any;
   riskOpacity?: number;
-  hotThreshold?: number;          
+  hotThreshold?: number;
   onRiskCellPress?: (p: any) => void;
   onViewportChange?: (bbox: BBox) => void;
   onMapClick?: (lngLat: [number, number]) => void;
@@ -31,16 +29,14 @@ export default function MapUniversal(props: MapUniversalProps) {
         onViewportChange={props.onViewportChange}
         onMapClick={props.onMapClick}
         markers={props.markers}
-        // maskGeoJSON prop'u buradan tamamen kaldırıldı.
       />
     );
   }
 
-  // Native placeholder
   return (
     <View style={{ flex: 1, backgroundColor: "#0b1220" }}>
       <Text style={{ color: "#fff", padding: 12 }}>
-        Native harita placeholder — iOS/Android için MapLibre/Mapbox'a geçilecek.
+        Native map placeholder — iOS/Android will use MapLibre/Mapbox.
       </Text>
     </View>
   );
