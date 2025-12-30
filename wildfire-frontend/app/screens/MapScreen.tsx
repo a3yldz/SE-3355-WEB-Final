@@ -9,8 +9,8 @@ import { useRiskNowcastsByPolygon, Area } from "../hooks/useRiskNowcast";
 import { BASE_URL } from "../utils/config";
 
 const AREAS: Area[] = [
-  { id: "ist", name: "Istanbul", bbox: { minLon: 28.0, minLat: 40.7, maxLon: 29.8, maxLat: 41.6 } },
-  { id: "izmir", name: "Izmir", bbox: { minLon: 26.0, minLat: 38.1, maxLon: 27.5, maxLat: 39.4 } },
+  { id: "ist", name: "İstanbul", bbox: { minLon: 28.0, minLat: 40.7, maxLon: 29.8, maxLat: 41.6 } },
+  { id: "izmir", name: "İzmir", bbox: { minLon: 26.0, minLat: 38.1, maxLon: 27.5, maxLat: 39.4 } },
   { id: "ankara", name: "Ankara", bbox: { minLon: 32.3, minLat: 39.6, maxLon: 33.1, maxLat: 40.1 } },
 ];
 
