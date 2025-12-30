@@ -14,3 +14,4 @@ class User(Base):
     role = Column(String(20), default="citizen")
     created_at = Column(DateTime, default=datetime.utcnow)
     fire_incidents = relationship("FireIncident", back_populates="reported_by_user")
+    reports = relationship("FireReport", back_populates="user")

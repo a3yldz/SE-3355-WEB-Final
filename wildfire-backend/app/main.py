@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import httpx
 import time
 
-from app.routes import health, smoke, risk
+from app.routes import health, smoke, risk, auth, admin
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -21,5 +21,7 @@ def include_routers(app: FastAPI):
     app.include_router(health.router)
     app.include_router(smoke.router)
     app.include_router(risk.router)
+    app.include_router(auth.router)
+    app.include_router(admin.router)
 
 include_routers(app)

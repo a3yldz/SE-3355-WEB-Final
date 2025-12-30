@@ -6,3 +6,9 @@ numpy
 shapely
 pydantic
 python-dotenv
+sqlalchemy
+psycopg2-binary
+alembic
+python-jose[cryptography]
+bcrypt
+email-validator
